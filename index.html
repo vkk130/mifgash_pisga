@@ -87,9 +87,14 @@
   .pm{width:26px;height:26px;border-radius:50%;color:#fff;font-weight:700;display:grid;place-items:center;font-size:12px;border:2px solid #fff;box-shadow:0 2px 6px #0003;font-family:Rubik}
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:99}
   .toast.show{opacity:1}
-  .ride{align-self:flex-start;font:inherit;font-size:13px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:3px 10px;cursor:pointer;color:var(--muted)}
-  .ride.on{background:var(--ink);color:#fff;border-color:var(--ink)}
-  .ride:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .ride{align-self:flex-end;display:flex;align-items:center;gap:7px;font:inherit;font-size:13px;color:var(--muted);background:none;border:none;padding:2px 0;cursor:pointer}
+  .ride i{position:relative;width:30px;height:17px;border-radius:999px;background:var(--line);transition:background .15s;flex:none}
+  .ride i::after{content:"";position:absolute;top:2px;right:2px;width:13px;height:13px;border-radius:50%;background:#fff;box-shadow:0 1px 2px #0003;transition:transform .15s}
+  .ride.on{color:var(--ink);font-weight:500}
+  .ride.on i{background:var(--a)}
+  .ride.on i::after{transform:translateX(-13px)}
+  .ride:focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-radius:6px}
+  @media (prefers-reduced-motion:reduce){.ride i,.ride i::after{transition:none}}
   #pool{margin-top:10px;display:none}
   #pool h3{margin:0 0 2px;font-size:17px}
   .pool-item{padding:10px 0;border-bottom:1px solid #f0ece2;font-size:15px;line-height:1.5}
@@ -119,7 +124,7 @@
       </div>
       <div class="progress" id="progress"><i></i></div>
       <div class="status" id="status"></div>
-      <div class="hint">מקלידים ובוחרים מהרשימה. מעדיפים לסמן? לוחצים על 📍 ואז על המפה. עד 25 אנשים. מישהו בלי רכב? מסמנים לו 🙋 ונמצא מי יאסוף.</div>
+      <div class="hint">מקלידים ובוחרים מהרשימה. מעדיפים לסמן? לוחצים על 📍 ואז על המפה. עד 25 אנשים. מישהו בלי רכב? מעבירים לו את המתג ל"צריך טרמפ" ונמצא מי יאסוף.</div>
     </div>
   </section>
 
@@ -154,7 +159,7 @@
           <p>אין לזה נוסחה סגורה, כי מרחק בכביש תלוי ברשת הכבישים. לכן מחפשים ברשת: בסבב הראשון פורשים רשת ריבועית של n×n נקודות על האזור של כל המשתתפים (פלוס 10%), כאשר n = ⌊√(100 − P)⌋ ו-P הוא מספר המשתתפים. בכל אחד משלושת הסבבים הבאים פורשים רשת חדשה וצפופה יותר סביב הנקודה הטובה ביותר לכל אחת משתי השיטות, ברוחב של צעד אחד מהרשת הקודמת. כל נקודה מוצמדת לכביש הקרוב, והמרחקים מגיעים מ-OSRM.</p>
           <p><b>נוסעים ביחד:</b> אחרי שיש נקודה, בודקים לכל זוג נהג ונוסע שתי אפשרויות: הנהג אוסף מהבית, או שנפגשים בנקודה x על המסלול של הנהג. לכל אפשרות מחשבים כמה זמן נסיעה ברכב נפרד נחסך (t הוא זמן נסיעה, R הנקודה, Δ<sub>d</sub> הסיבוב של הנהג):</p>
           <div class="math">s = t(p,R) − t(p,x) − Δ<sub>d</sub></div>
-          <p>מציעים רק אם הסיבוב של מי שעושה אותו (נהג או נוסע) הוא עד 15% מהנסיעה שלו ולא יותר מ-20 דק׳. הסיבוב על חשבון הזמן של מי שעושה אותו, והנקודה עצמה לא זזה. את הזוגות משבצים לפי החיסכון מהגדול לקטן (שיטת החיסכון של Clarke–Wright), וקודם כל את מי שצריך טרמפ.</p>
+          <p>מציעים אם הסיבוב של מי שעושה אותו (נהג או נוסע) הוא עד 15% מהנסיעה שלו, או עד 10 דק׳ בכל מקרה, ולא יותר מ-20 דק׳. אם המסלולים חופפים ב-90% מהדרך או יותר, מציעים גם בסיבוב של עד 20 דק׳. הסיבוב על חשבון הזמן של מי שעושה אותו, והנקודה עצמה לא זזה. את הזוגות משבצים לפי החיסכון מהגדול לקטן (שיטת החיסכון של Clarke–Wright), וקודם כל את מי שצריך טרמפ.</p>
         </details>
       </div>
       <div class="card" id="pool">
@@ -257,7 +262,7 @@ function renderPeople() {
       <div class="fields">
         <input class="name" data-id="${p.id}" data-f="name" placeholder="שם" value="${esc(p.name)}">
         <input class="addr ${p.lat != null ? "ok" : ""}" data-id="${p.id}" data-f="addr" placeholder="מאיפה יוצאים? עיר או רחוב" value="${esc(p.addr)}" autocomplete="off">
-        <button class="ride ${p.ride ? "on" : ""}" data-ride="${p.id}" aria-pressed="${p.ride}">🙋 ${p.ride ? "צריך טרמפ" : "צריך טרמפ?"}</button>
+        <button class="ride ${p.ride ? "on" : ""}" data-ride="${p.id}" role="switch" aria-checked="${p.ride}" aria-label="צריך טרמפ"><span>${p.ride ? "צריך טרמפ" : "מגיע עם רכב"}</span><i></i></button>
       </div>
       <button class="iconbtn ${picking === p.id ? "on" : ""}" title="בחירה במפה" data-pick="${p.id}">📍</button>
       <button class="del" title="הסרה" data-del="${p.id}">×</button>`;
@@ -276,7 +281,7 @@ function updateCalc() {
 }
 $("#add").onclick = () => addPerson();
 $("#people").addEventListener("click", e => {
-  const del = e.target.dataset.del, pick = e.target.dataset.pick, ride = e.target.dataset.ride;
+  const del = e.target.dataset.del, pick = e.target.dataset.pick, ride = e.target.closest("[data-ride]")?.dataset.ride;
   if (ride) {
     const p = people.find(x => x.id == ride); p.ride = !p.ride; renderPeople();
     const s = results?.src.find(x => x.id === p.id);
@@ -584,7 +589,8 @@ async function osrmRoute(a, b) {
 // Only offered when whoever makes the detour adds ≤ min(15% of own trip, 20 min) — on their own time.
 // Assignment: greedy by saving (Clarke–Wright style), people who need a ride first. No seat limit.
 const POOL_SAMPLES = 30;
-const detourLimit = t => Math.min(0.15 * t, 1200);
+const detourLimit = t => Math.min(Math.max(0.15 * t, 600), 1200);   // 15% of own trip, but 10 min is always fine; never over 20
+const OVERLAP = 0.9;   // routes that share ≥90% of the way are suggested even if the detour is a bit over the limit (≤20 min)
 let pool = { sum: null, fair: null };
 function routeSamples(r, n) {
   const g = r.g, last = g.length - 1, out = [];
@@ -628,7 +634,8 @@ async function computePool(k) {
         smp.forEach((x, j) => {
           const tpx = dur[p][P + j]; if (tpx == null) return;
           const extra = Math.max(0, tpx + x.rem - tp);
-          opts.push({ kind: "route", x, idx: x.idx, leg: tpx, extra, who: "p", ok: extra <= detourLimit(tp), s: tp - tpx });
+          const overlap = Math.min(1, x.rem / tp);
+          opts.push({ kind: "route", x, idx: x.idx, leg: tpx, extra, overlap, who: "p", ok: extra <= detourLimit(tp) || (overlap >= OVERLAP && extra <= 1200), s: tp - tpx });
         });
         const minGain = src[p].ride ? 0 : Math.max(300, 0.3 * tp);   // don't suggest "drive alone 40 min to share the last 5"
         opts.filter(o => o.ok && o.s >= minGain).forEach(o => cand.push({ ...o, d, p }));
@@ -698,12 +705,13 @@ function poolLines(ent, b, t = x => x) {
   for (const m of ent.plan) {
     if (m.kind === "door") {
       const main = `${nm(m.p)} עולה לרכב של ${nm(m.d)} כבר מהבית.`;
-      let sub = m.extra < 60 ? "כמעט בלי סיבוב." : `סיבוב של ${mins(m.extra)} דק׳ ל${src[m.d].name}.`;
+      let sub = m.extra < 60 ? "כמעט בלי סיבוב, ונוסעים ביחד כל הדרך." : `סיבוב של ${mins(m.extra)} דק׳ ל${src[m.d].name}, ובתמורה נוסעים ביחד כל הדרך.`;
       if (m.over) sub += " יותר ממה שנחשב סביר, אבל ככה כולם מגיעים 🙃";
       out.push({ main, sub });
     } else {
       const main = `${nm(m.p)} ו${nm(m.d)} נפגשים ${m.idx > 0 ? t(m.where) : "אצל " + nm(m.d)}, ומשם ממשיכים ברכב אחד.`;
       let sub = `${mins(m.leg)} דק׳ נסיעה עד שם ל${src[m.p].name}.`;
+      if (m.overlap >= OVERLAP) sub += ` המסלולים שלכם חופפים ב-${Math.round(m.overlap * 100)}% מהדרך.`;
       if (m.extra >= 60) sub += ` זה מוסיף ל${src[m.p].name} ${mins(m.extra)} דק׳ לדרך.`;
       out.push({ main, sub, x: m.x });
     }
