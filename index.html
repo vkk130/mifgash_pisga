@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>מפגש פסגה — איפה נפגשים?</title>
+<meta name="description" content="מכניסים איפה כל אחד גר, ומקבלים את נקודת המפגש הכי יעילה ואת הכי הוגנת.">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f6f3ec; --ink:#1d2a2a; --muted:#6b7672; --card:#fffdf8; --line:#e3ddcf;
+    --a:#e0592a; /* efficient */ --b:#2a7f6f; /* fair */ --accent:#1d2a2a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Rubik,system-ui,sans-serif}
+  body{min-height:100vh}
+  header{padding:22px 18px 8px;max-width:1100px;margin:auto}
+  h1{margin:0;font-size:30px;font-weight:800;letter-spacing:-.5px}
+  h1 span{color:var(--a)}
+  .sub{color:var(--muted);margin:4px 0 0;font-size:15px}
+  main{max-width:1100px;margin:auto;padding:10px 18px 40px;display:grid;gap:18px;grid-template-columns:400px 1fr}
+  @media (max-width:860px){main{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+  .people{display:flex;flex-direction:column;gap:10px}
+  .row{display:grid;grid-template-columns:28px 1fr 38px 32px;gap:6px;align-items:start;position:relative}
+  .dot{width:28px;height:28px;border-radius:50%;color:#fff;font-weight:700;display:grid;place-items:center;font-size:13px;margin-top:5px}
+  .fields{display:flex;flex-direction:column;gap:5px;min-width:0}
+  input{font:inherit;font-size:15px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#fff;width:100%;color:var(--ink)}
+  input:focus{outline:2px solid var(--ink);outline-offset:-1px}
+  input.name{font-weight:500}
+  input.ok{border-color:#9cc9b9;background:#f4fbf8}
+  .iconbtn{border:1px solid var(--line);background:#fff;border-radius:10px;height:38px;cursor:pointer;font-size:17px}
+  .iconbtn.on{background:var(--ink);color:#fff}
+  .del{border:none;background:none;color:var(--muted);font-size:20px;cursor:pointer;height:38px}
+  .sugg{position:absolute;top:100%;right:34px;left:76px;z-index:20;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px #0002;overflow:hidden}
+  .sugg div{padding:9px 11px;cursor:pointer;font-size:14px;border-bottom:1px solid #f0ece2}
+  .sugg div:hover,.sugg div.act{background:#f6f3ec}
+  .sugg small{color:var(--muted)}
+  .actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+  .btn{font:inherit;font-weight:700;border:none;border-radius:12px;padding:12px 16px;cursor:pointer;background:var(--ink);color:#fff;font-size:16px}
+  .btn.ghost{background:transparent;color:var(--ink);border:1.5px dashed var(--line)}
+  .btn:disabled{opacity:.45;cursor:default}
+  .btn.go{flex:1}
+  .hint{font-size:13px;color:var(--muted);margin-top:10px;line-height:1.5}
+  #map{height:440px;border-radius:16px;overflow:hidden;border:1px solid var(--line)}
+  @media (max-width:860px){#map{height:340px}}
+  .picking #map{outline:3px solid var(--a)}
+  .progress{height:6px;background:#ece6d8;border-radius:6px;overflow:hidden;margin-top:12px;display:none}
+  .progress i{display:block;height:100%;width:0;background:var(--a);transition:width .3s}
+  .status{font-size:14px;color:var(--muted);margin-top:6px;min-height:20px}
+  .tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}
+  .tab{border:2px solid var(--line);border-radius:14px;padding:12px;background:var(--card);cursor:pointer;text-align:right;font:inherit;color:var(--ink)}
+  .tab b{display:block;font-size:16px}
+  .tab small{color:var(--muted)}
+  .tab.on.a{border-color:var(--a);background:#fdf0ea}
+  .tab.on.b{border-color:var(--b);background:#eaf5f2}
+  #results{display:none}
+  .place{font-size:20px;font-weight:700;margin:14px 0 4px}
+  .nav{display:flex;gap:8px;margin:8px 0 12px;flex-wrap:wrap}
+  .nav a{font-size:14px;color:var(--ink);background:#fff;border:1px solid var(--line);padding:6px 10px;border-radius:9px;text-decoration:none}
+  table{width:100%;border-collapse:collapse;font-size:15px}
+  td{padding:8px 4px;border-bottom:1px solid #f0ece2}
+  td.km{text-align:left;font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}
+  .bar{height:6px;border-radius:4px;margin-top:4px}
+  .totals{display:flex;gap:16px;margin-top:10px;font-size:14px;color:var(--muted);flex-wrap:wrap}
+  .totals b{color:var(--ink)}
+  .share{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap}
+  .share .btn{flex:1}
+  .wa{background:#1fa855}
+  pre#preview{white-space:pre-wrap;font:inherit;font-size:14px;background:#f6f3ec;border-radius:12px;padding:12px;margin-top:12px;line-height:1.6;display:none}
+  .how{margin-top:14px;font-size:14px;color:var(--muted);line-height:1.6}
+  .how summary{cursor:pointer;color:var(--ink);font-weight:500}
+  .pin{width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid #fff;box-shadow:0 3px 10px #0004;display:grid;place-items:center}
+  .pin span{transform:rotate(45deg);color:#fff;font-size:16px}
+  .pm{width:26px;height:26px;border-radius:50%;color:#fff;font-weight:700;display:grid;place-items:center;font-size:12px;border:2px solid #fff;box-shadow:0 2px 6px #0003;font-family:Rubik}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:99}
+  .toast.show{opacity:1}
+  footer{text-align:center;color:var(--muted);font-size:12px;padding:0 18px 24px}
+  footer a{color:inherit}
+</style>
+</head>
+<body>
+<header>
+  <h1>מפגש <span>פסגה</span> ⛰️</h1>
+  <p class="sub">מכניסים איפה כל אחד נמצא, ומקבלים איפה הכי כדאי להיפגש.</p>
+</header>
+
+<main>
+  <section>
+    <div class="card">
+      <div class="people" id="people"></div>
+      <div class="actions">
+        <button class="btn ghost" id="add">+ עוד משתתף</button>
+        <button class="btn go" id="calc" disabled>איפה נפגשים? 🔎</button>
+      </div>
+      <div class="progress" id="progress"><i></i></div>
+      <div class="status" id="status"></div>
+      <div class="hint">הקלידו כתובת או יישוב ובחרו מהרשימה, או לחצו 📍 ואחר כך על המפה. עד 25 משתתפים.</div>
+    </div>
+
+    <div id="results">
+      <div class="tabs">
+        <button class="tab a on" data-k="sum"><b>⚡ הכי יעיל</b><small>הכי מעט קילומטרים לכולם ביחד</small></button>
+        <button class="tab b" data-k="fair"><b>⚖️ הכי הוגן</b><small>אף אחד לא נוסע יותר מדי</small></button>
+      </div>
+      <div class="card" style="margin-top:10px">
+        <div class="place" id="place"></div>
+        <div class="nav" id="nav"></div>
+        <table id="table"></table>
+        <div class="totals" id="totals"></div>
+        <div class="share">
+          <button class="btn wa" id="shareWa">שיתוף בוואטסאפ</button>
+          <button class="btn ghost" id="shareCopy">העתקה</button>
+        </div>
+        <pre id="preview"></pre>
+        <details class="how">
+          <summary>איך זה מחושב?</summary>
+          <p>אנחנו מפזרים עשרות נקודות מועמדות על המפה סביב כל המשתתפים, ובודקים לכל אחת מהן את מרחק הנסיעה ברכב בכבישים מכל משתתף (לא קו אווירי). אחר כך מתמקדים סביב הנקודות הטובות ביותר ומחפשים שוב בצפיפות גבוהה יותר, ארבעה סבבים בסך הכל.</p>
+          <p><b>הכי יעיל:</b> הנקודה שבה סכום הקילומטרים של כולם הוא הקטן ביותר. היא נמשכת לכיוון שבו גרים הכי הרבה אנשים.</p>
+          <p><b>הכי הוגן:</b> הנקודה שבה מי שנוסע הכי הרבה נוסע הכי מעט שאפשר. כך אף אחד לא נדפק במיוחד.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div id="map"></div>
+  </section>
+</main>
+
+<footer>
+  מרחקי נסיעה: <a href="https://project-osrm.org" target="_blank">OSRM</a> · חיפוש: <a href="https://photon.komoot.io" target="_blank">Photon</a> ו-<a href="https://nominatim.org" target="_blank">Nominatim</a> · מפה: <a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>
+</footer>
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+"use strict";
+const MAX_PEOPLE = 25;
+const OSRM = "https://router.project-osrm.org/table/v1/driving/";
+const OSRM_MAX_COORDS = 100;          // public server's table limit
+const ROUNDS = 4;                     // 1 wide + 3 refinements
+const COLORS = ["#e0592a","#2a7f6f","#6b4fbb","#d1912a","#c2366d","#2f6db5","#5d8a2b","#a0522d","#127a8a","#8a3fa0"];
+const $ = s => document.querySelector(s);
+
+// ---------- state ----------
+let people = [];   // {id, name, addr, lat, lon}
+let nextId = 1;
+let picking = null;
+let results = null; // {sum:{lat,lon,d:[]}, fair:{...}}
+let mode = "sum";
+const placeNames = {};
+
+// ---------- map ----------
+maplibregl.setRTLTextPlugin("https://unpkg.com/@mapbox/mapbox-gl-rtl-text@0.2.3/mapbox-gl-rtl-text.min.js", true);
+const map = new maplibregl.Map({
+  container: "map", style: "https://tiles.openfreemap.org/styles/liberty",
+  center: [35.0, 31.75], zoom: 7, attributionControl: { compact: true }
+});
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
+const markers = {};
+let resultMarker = null;
+map.on("load", () => {
+  map.addSource("lines", { type: "geojson", data: emptyFC() });
+  map.addLayer({ id: "lines", type: "line", source: "lines",
+    paint: { "line-color": ["get", "c"], "line-width": 2.5, "line-dasharray": [2, 1.5], "line-opacity": .8 } });
+  if (results) drawResult();
+});
+map.on("click", e => {
+  if (!picking) return;
+  const p = people.find(x => x.id === picking);
+  setPicking(null);
+  if (!p) return;
+  p.lat = e.lngLat.lat; p.lon = e.lngLat.lng; p.addr = "נקודה במפה";
+  renderPeople(); syncMarkers();
+  reverseName(p.lat, p.lon).then(n => { if (n) { p.addr = n; renderPeople(); } });
+});
+function emptyFC() { return { type: "FeatureCollection", features: [] }; }
+const color = i => COLORS[i % COLORS.length];
+const initial = n => (n || "?").trim().charAt(0) || "?";
+
+// ---------- people UI ----------
+function addPerson(data = {}) {
+  if (people.length >= MAX_PEOPLE) return toast("הגעתם למקסימום של " + MAX_PEOPLE + " משתתפים");
+  people.push({ id: nextId++, name: data.name || "", addr: data.addr || "", lat: data.lat ?? null, lon: data.lon ?? null });
+  renderPeople();
+}
+function renderPeople() {
+  const box = $("#people");
+  const focusedId = document.activeElement?.dataset?.id, focusedField = document.activeElement?.dataset?.f;
+  box.innerHTML = "";
+  people.forEach((p, i) => {
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = `
+      <div class="dot" style="background:${color(i)}">${esc(initial(p.name) === "?" ? i + 1 : initial(p.name))}</div>
+      <div class="fields">
+        <input class="name" data-id="${p.id}" data-f="name" placeholder="שם (למשל: איתן)" value="${esc(p.name)}">
+        <input class="addr ${p.lat != null ? "ok" : ""}" data-id="${p.id}" data-f="addr" placeholder="כתובת או יישוב" value="${esc(p.addr)}" autocomplete="off">
+      </div>
+      <button class="iconbtn ${picking === p.id ? "on" : ""}" title="בחירה במפה" data-pick="${p.id}">📍</button>
+      <button class="del" title="הסרה" data-del="${p.id}">×</button>`;
+    box.appendChild(row);
+  });
+  if (focusedId) {
+    const el = box.querySelector(`input[data-id="${focusedId}"][data-f="${focusedField}"]`);
+    if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+  }
+  $("#add").disabled = people.length >= MAX_PEOPLE;
+  updateCalc();
+}
+function updateCalc() {
+  const ready = people.filter(p => p.lat != null).length;
+  $("#calc").disabled = ready < 2;
+}
+$("#add").onclick = () => addPerson();
+$("#people").addEventListener("click", e => {
+  const del = e.target.dataset.del, pick = e.target.dataset.pick;
+  if (del) { people = people.filter(p => p.id != del); renderPeople(); syncMarkers(); }
+  if (pick) setPicking(picking == pick ? null : +pick);
+});
+function setPicking(id) {
+  picking = id;
+  document.body.classList.toggle("picking", !!id);
+  if (id) { toast("לחצו על המפה כדי לבחור מיקום"); if (innerWidth < 860) $("#map").scrollIntoView({ behavior: "smooth", block: "center" }); }
+  renderPeople();
+}
+
+// ---------- address autocomplete (Photon) ----------
+let suggTimer = null, suggBox = null, suggItems = [], suggIdx = -1;
+$("#people").addEventListener("input", e => {
+  const id = +e.target.dataset.id, f = e.target.dataset.f;
+  const p = people.find(x => x.id === id); if (!p) return;
+  if (f === "name") {
+    p.name = e.target.value;
+    const dot = e.target.closest(".row").querySelector(".dot");
+    dot.textContent = initial(p.name) === "?" ? people.indexOf(p) + 1 : initial(p.name);
+    syncMarkers();
+  } else {
+    p.addr = e.target.value; p.lat = p.lon = null;
+    e.target.classList.remove("ok"); updateCalc(); syncMarkers();
+    clearTimeout(suggTimer);
+    suggTimer = setTimeout(() => suggest(e.target, p), 300);
+  }
+});
+$("#people").addEventListener("keydown", e => {
+  if (!suggBox || e.target.dataset.f !== "addr") return;
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    suggIdx = (suggIdx + (e.key === "ArrowDown" ? 1 : -1) + suggItems.length) % suggItems.length;
+    [...suggBox.children].forEach((c, i) => c.classList.toggle("act", i === suggIdx));
+  } else if (e.key === "Enter" && suggItems.length) {
+    e.preventDefault(); suggBox.children[Math.max(0, suggIdx)].dispatchEvent(new Event("mousedown"));
+  } else if (e.key === "Escape") closeSugg();
+});
+document.addEventListener("click", e => { if (suggBox && !suggBox.contains(e.target)) closeSugg(); });
+function closeSugg() { suggBox?.remove(); suggBox = null; suggItems = []; suggIdx = -1; }
+async function suggest(input, p) {
+  const q = input.value.trim();
+  if (q.length < 2) return closeSugg();
+  let feats = [];
+  try {
+    const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lat=31.8&lon=35.0&bbox=34.2,29.4,35.95,33.35`);
+    feats = (await r.json()).features || [];
+  } catch { return; }
+  if (input.value.trim() !== q) return;
+  closeSugg();
+  if (!feats.length) return;
+  suggItems = feats;
+  suggBox = document.createElement("div");
+  suggBox.className = "sugg";
+  feats.forEach(f => {
+    const pr = f.properties;
+    const main = pr.name || [pr.street, pr.housenumber].filter(Boolean).join(" ");
+    const sub = [pr.street && pr.name ? [pr.street, pr.housenumber].filter(Boolean).join(" ") : "", pr.city || pr.county || "", pr.city ? "" : pr.state || ""].filter(Boolean).join(", ");
+    const d = document.createElement("div");
+    d.innerHTML = `${esc(main)} <small>${esc(sub)}</small>`;
+    d.addEventListener("mousedown", ev => {
+      ev.preventDefault();
+      p.lat = f.geometry.coordinates[1]; p.lon = f.geometry.coordinates[0];
+      p.addr = [main, pr.city && pr.city !== main ? pr.city : ""].filter(Boolean).join(", ");
+      closeSugg(); renderPeople(); syncMarkers(); fitAll();
+    });
+    suggBox.appendChild(d);
+  });
+  input.closest(".row").appendChild(suggBox);
+}
+
+// ---------- markers ----------
+function syncMarkers() {
+  const live = new Set();
+  people.forEach((p, i) => {
+    if (p.lat == null) return;
+    live.add(p.id);
+    let m = markers[p.id];
+    if (!m) {
+      const el = document.createElement("div"); el.className = "pm";
+      m = markers[p.id] = new maplibregl.Marker({ element: el }).setLngLat([p.lon, p.lat]).addTo(map);
+    }
+    m.setLngLat([p.lon, p.lat]);
+    const el = m.getElement(); el.style.background = color(i); el.textContent = initial(p.name) === "?" ? i + 1 : initial(p.name);
+    el.title = p.name;
+  });
+  Object.keys(markers).forEach(id => { if (!live.has(+id)) { markers[id].remove(); delete markers[id]; } });
+}
+function fitAll(extra) {
+  const pts = people.filter(p => p.lat != null).map(p => [p.lon, p.lat]);
+  if (extra) pts.push(extra);
+  if (!pts.length) return;
+  if (pts.length === 1) return map.flyTo({ center: pts[0], zoom: 11 });
+  const b = new maplibregl.LngLatBounds(pts[0], pts[0]); pts.forEach(x => b.extend(x));
+  map.fitBounds(b, { padding: 50, maxZoom: 13, duration: 600 });
+}
+
+// ---------- the optimisation ----------
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let lastCall = 0;
+async function osrmTable(srcs, dests) {
+  const wait = 1100 - (Date.now() - lastCall);   // be polite to the public server (~1 req/s)
+  if (wait > 0) await sleep(wait);
+  lastCall = Date.now();
+  const coords = [...srcs, ...dests].map(p => `${p.lon.toFixed(6)},${p.lat.toFixed(6)}`).join(";");
+  const s = srcs.map((_, i) => i).join(";");
+  const d = dests.map((_, i) => i + srcs.length).join(";");
+  const url = `${OSRM}${coords}?sources=${s}&destinations=${d}&annotations=distance`;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const r = await fetch(url);
+      if (r.status === 429) { await sleep(2000 * (attempt + 1)); continue; }
+      const j = await r.json();
+      if (j.code !== "Ok") throw new Error(j.message || j.code);
+      return { dist: j.distances, snapped: j.destinations.map(w => ({ lon: w.location[0], lat: w.location[1] })) };
+    } catch (e) { if (attempt === 2) throw e; await sleep(1500); }
+  }
+  throw new Error("השרת עמוס");
+}
+function grid(center, halfLat, halfLon, n) {
+  const out = [];
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++)
+    out.push({ lat: center.lat - halfLat + (2 * halfLat * i) / (n - 1), lon: center.lon - halfLon + (2 * halfLon * j) / (n - 1) });
+  return out;
+}
+function score(dist, j, P) {
+  let sum = 0, max = 0;
+  for (let i = 0; i < P; i++) { const v = dist[i][j]; if (v == null) return null; sum += v; if (v > max) max = v; }
+  return { sum, max };
+}
+const better = { sum: (a, b) => a.sum < b.sum - 1 || (Math.abs(a.sum - b.sum) <= 1 && a.max < b.max),
+                 fair: (a, b) => a.max < b.max - 1 || (Math.abs(a.max - b.max) <= 1 && a.sum < b.sum) };
+
+async function optimise(src, onProgress) {
+  const P = src.length;
+  const budget = OSRM_MAX_COORDS - P;
+  const lats = src.map(p => p.lat), lons = src.map(p => p.lon);
+  const center = { lat: (Math.min(...lats) + Math.max(...lats)) / 2, lon: (Math.min(...lons) + Math.max(...lons)) / 2 };
+  const kLon = 1 / Math.cos(center.lat * Math.PI / 180);
+  let half = Math.max((Math.max(...lats) - Math.min(...lats)) / 2, (Math.max(...lons) - Math.min(...lons)) / 2 / kLon, 0.01) * 1.1;
+  const best = { sum: null, fair: null };
+  for (let r = 0; r < ROUNDS; r++) {
+    let cands = [];
+    if (r === 0) {
+      const n = Math.floor(Math.sqrt(budget));
+      cands = grid(center, half, half * kLon, n).map(c => ({ ...c, k: "both" }));
+      half = (2 * half) / (n - 1);
+    } else {
+      const n = Math.floor(Math.sqrt(budget / 2));
+      for (const k of ["sum", "fair"]) cands.push(...grid(best[k], half, half * kLon, n).map(c => ({ ...c, k })));
+      half = (2 * half) / (n - 1);
+    }
+    const { dist, snapped } = await osrmTable(src, cands);
+    cands.forEach((c, j) => {
+      const s = score(dist, j, P); if (!s) return;
+      const cand = { ...snapped[j], ...s, d: dist.map(row => row[j]) };
+      for (const k of ["sum", "fair"]) if (!best[k] || better[k](cand, best[k])) best[k] = cand;
+    });
+    if (!best.sum) throw new Error("לא הצלחנו למצוא מסלולי נסיעה בין הנקודות");
+    onProgress((r + 1) / ROUNDS);
+  }
+  return best;
+}
+
+$("#calc").onclick = runCalc;
+async function runCalc() {
+  const src = people.filter(p => p.lat != null);
+  if (src.length < 2) return;
+  people.forEach((p, i) => { if (!p.name.trim()) p.name = "משתתף " + (i + 1); });
+  renderPeople(); syncMarkers();
+  const btn = $("#calc"); btn.disabled = true;
+  $("#progress").style.display = "block"; $("#progress i").style.width = "4%";
+  $("#status").textContent = "מחשבים מרחקי נסיעה בכבישים… (כ-5 שניות)";
+  try {
+    const best = await optimise(src, f => { $("#progress i").style.width = (f * 100) + "%"; });
+    results = { src: src.map(p => ({ ...p })), sum: best.sum, fair: best.fair };
+    $("#status").textContent = "";
+    writeHash();
+    showResults();
+  } catch (e) {
+    $("#status").textContent = "אופס, משהו השתבש: " + (e.message || e) + ". נסו שוב בעוד רגע.";
+  } finally {
+    btn.disabled = false; updateCalc();
+    setTimeout(() => $("#progress").style.display = "none", 600);
+  }
+}
+
+// ---------- results ----------
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => { mode = t.dataset.k; showResults(); });
+const km = m => { const k = m / 1000; return k < 10 ? k.toFixed(1).replace(/\.0$/, "") : Math.round(k).toString(); };
+
+async function showResults() {
+  if (!results) return;
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.dataset.k === mode));
+  $("#results").style.display = "block";
+  const R = results[mode], src = results.src;
+  const key = R.lat.toFixed(4) + "," + R.lon.toFixed(4);
+  $("#place").textContent = placeNames[key] ? "📍 ליד " + placeNames[key] : "📍 מחפשים שם למקום…";
+  if (!placeNames[key]) reverseName(R.lat, R.lon, true).then(n => { placeNames[key] = n || "הנקודה שבמפה"; if (results[mode] === R) $("#place").textContent = "📍 ליד " + placeNames[key]; updatePreview(); });
+  $("#nav").innerHTML = `<a target="_blank" href="${wazeUrl(R)}">🚗 Waze</a><a target="_blank" href="${gmapsUrl(R)}">🗺️ Google Maps</a>`;
+  const maxD = Math.max(...R.d);
+  const order = src.map((p, i) => ({ p, i, d: R.d[i] })).sort((a, b) => b.d - a.d);
+  $("#table").innerHTML = order.map(o => `<tr><td>${esc(o.p.name)}<div class="bar" style="width:${Math.max(4, 100 * o.d / maxD)}%;background:${color(people.findIndex(x => x.id === o.p.id) < 0 ? o.i : people.findIndex(x => x.id === o.p.id))}"></div></td><td class="km">${km(o.d)} ק״מ</td></tr>`).join("");
+  $("#totals").innerHTML = `<span>סך הכל: <b>${km(R.sum)} ק״מ</b></span><span>הכי רחוק: <b>${km(R.max)} ק״מ</b></span><span>פער: <b>${km(R.max - Math.min(...R.d))} ק״מ</b></span>`;
+  drawResult();
+  writeHash();
+  updatePreview();
+}
+function drawResult() {
+  if (!results || !map.getSource("lines")) return;
+  const R = results[mode];
+  const c = mode === "sum" ? "#e0592a" : "#2a7f6f";
+  if (!resultMarker) {
+    const el = document.createElement("div"); el.className = "pin"; el.innerHTML = "<span>⛰️</span>";
+    resultMarker = new maplibregl.Marker({ element: el, anchor: "bottom" }).setLngLat([R.lon, R.lat]).addTo(map);
+  }
+  resultMarker.setLngLat([R.lon, R.lat]);
+  resultMarker.getElement().style.background = c;
+  map.getSource("lines").setData({ type: "FeatureCollection", features: results.src.map(p => ({
+    type: "Feature", properties: { c }, geometry: { type: "LineString", coordinates: [[p.lon, p.lat], [R.lon, R.lat]] } })) });
+  fitAll([R.lon, R.lat]);
+}
+const wazeUrl = R => `https://waze.com/ul?ll=${R.lat.toFixed(6)},${R.lon.toFixed(6)}&navigate=yes`;
+const gmapsUrl = R => `https://www.google.com/maps/search/?api=1&query=${R.lat.toFixed(6)},${R.lon.toFixed(6)}`;
+
+async function reverseName(lat, lon, broad) {
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=${broad ? 14 : 17}&accept-language=he`);
+    const j = await r.json(), a = j.address || {};
+    if (broad) {
+      const town = a.city || a.town || a.village || a.hamlet || a.suburb || a.municipality || a.county;
+      const road = a.road;
+      return [road, town].filter(Boolean).join(", ") || j.name || null;
+    }
+    return [a.road && [a.road, a.house_number].filter(Boolean).join(" "), a.city || a.town || a.village].filter(Boolean).join(", ") || j.display_name;
+  } catch { return null; }
+}
+
+// ---------- funny lines ----------
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const BANK = [
+  [2,   ["אפשר בעצם לבוא ברגל 🚶 רק {k} ק״מ.", "זה ממש ליד הבית, {k} ק״מ. אין תירוצים לאיחור!", "{k} ק״מ? בקושי מספיק להתניע את האוטו."]],
+  [8,   ["איזה כיף, כבר ממש באזור! רק {k} ק״מ.", "נסיעה של שיר וחצי: {k} ק״מ 🎶", "{k} ק״מ, כמעט שכנים של נקודת המפגש."]],
+  [20,  ["נסיעה קצרה ונעימה, {k} ק״מ. שלושה שירים וזהו.", "{k} ק״מ, בקושי מספיק לחמם את המזגן.", "רק {k} ק״מ, אין על מה להתלונן 😎"]],
+  [40,  ["{k} ק״מ, סביר לגמרי. כדאי להביא חטיף לדרך.", "{k} ק״מ, זמן מצוין לפרק של פודקאסט 🎧", "{k} ק״מ, נסיעה הוגנת לגמרי."]],
+  [70,  ["{k} ק״מ... כדאי לבדוק כמה דלק יש במיכל ⛽", "{k} ק״מ. זה כבר זמן לסדר את כל הפלייליסט מחדש.", "{k} ק״מ, אבל בשביל החברים זה שווה את זה 💪"]],
+  [120, ["אני מצטער, אבל אתה גר ממש רחוק... תצטרך לנסוע {k} ק״מ.", "{k} ק״מ 😬 קפה לדרך זה כבר חובה.", "{k} ק״מ. אולי כדאי להודיע לבוס שמחר מגיעים קצת מאוחר."]],
+  [1e9, ["{k} ק״מ?! זה כבר לא מפגש, זה טיול שנתי 🏕️", "{k} ק״מ. אולי עדיף לבנות שם בית...", "{k} ק״מ 🫠 תבוא, נחכה לך עם עוגה."]]
+];
+function funnyLine(d, rank, total) {
+  const k = km(d);
+  let line = pick(BANK.find(([lim]) => d / 1000 < lim)[1]).replace("{k}", k);
+  if (total > 2 && rank === 0) line += mode === "sum" ? " (הגיבור של הקבוצה 🏅)" : " (הכי רחוק, אבל זה המינימום האפשרי 🤝)";
+  if (total > 2 && rank === total - 1 && d > 2000) line += " (המזל בצד שלך 🍀)";
+  return line;
+}
+
+function shareText() {
+  const R = results[mode], src = results.src;
+  const key = R.lat.toFixed(4) + "," + R.lon.toFixed(4);
+  const order = src.map((p, i) => ({ p, d: R.d[i] })).sort((a, b) => b.d - a.d);
+  const title = mode === "sum" ? "⚡ האפשרות הכי יעילה (הכי מעט קילומטרים לכולם ביחד)" : "⚖️ האפשרות הכי הוגנת (אף אחד לא נוסע יותר מדי)";
+  const how = mode === "sum"
+    ? "איך חישבנו? בדקנו מאות נקודות על המפה, ולכל אחת מרחק נסיעה ברכב בכבישים מכל אחד מאיתנו. בחרנו את הנקודה שבה סך הקילומטרים של כולנו הוא הקטן ביותר."
+    : "איך חישבנו? בדקנו מאות נקודות על המפה, ולכל אחת מרחק נסיעה ברכב בכבישים מכל אחד מאיתנו. בחרנו את הנקודה שבה מי שנוסע הכי הרבה נוסע הכי מעט שאפשר.";
+  const lines = [
+    "⛰️ מפגש פסגה: איפה נפגשים?",
+    "",
+    title,
+    "📍 " + (placeNames[key] ? "ליד " + placeNames[key] : "הנקודה במפה"),
+    "🚗 ניווט: " + wazeUrl(R),
+    "",
+    ...order.map((o, r) => `${o.p.name}: ${funnyLine(o.d, r, order.length)}`),
+    "",
+    `סך הכל ${km(R.sum)} ק״מ לכולנו ביחד, והכי רחוק ${km(R.max)} ק״מ.`,
+    "",
+    how,
+    "",
+    "לתוצאה המלאה: " + location.href
+  ];
+  return lines.join("\n");
+}
+let cachedText = "", cachedFor = "";
+function updatePreview() {
+  const R = results[mode];
+  const sig = mode + R.lat + placeNames[R.lat.toFixed(4) + "," + R.lon.toFixed(4)];
+  if (sig !== cachedFor) { cachedText = shareText(); cachedFor = sig; }
+  $("#preview").textContent = cachedText; $("#preview").style.display = "block";
+}
+$("#shareWa").onclick = () => {
+  updatePreview();
+  window.open("https://wa.me/?text=" + encodeURIComponent(cachedText), "_blank");
+};
+$("#shareCopy").onclick = async () => {
+  updatePreview();
+  try { await navigator.clipboard.writeText(cachedText); toast("ההודעה הועתקה ✔"); }
+  catch { toast("לא הצלחנו להעתיק, אפשר לסמן את הטקסט ולהעתיק ידנית"); }
+};
+
+// ---------- link state ----------
+function writeHash() {
+  const data = { p: results.src.map(p => [p.name, +p.lat.toFixed(5), +p.lon.toFixed(5), p.addr]), m: mode };
+  history.replaceState(null, "", "#" + b64e(JSON.stringify(data)));
+}
+function readHash() {
+  if (location.hash.length < 3) return false;
+  try {
+    const data = JSON.parse(b64d(location.hash.slice(1)));
+    data.p.slice(0, MAX_PEOPLE).forEach(([name, lat, lon, addr]) => addPerson({ name, lat, lon, addr }));
+    if (data.m === "fair") mode = "fair";
+    return true;
+  } catch { return false; }
+}
+const b64e = s => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const b64d = s => decodeURIComponent(escape(atob(s.replace(/-/g, "+").replace(/_/g, "/"))));
+
+// ---------- misc ----------
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+let toastT;
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 2200); }
+
+// ---------- boot ----------
+if (readHash()) {
+  syncMarkers(); fitAll();
+  const m = mode; runCalc().then(() => { mode = m; if (results) showResults(); });
+} else {
+  addPerson(); addPerson(); addPerson();
+}
+</script>
+</body>
+</html>
