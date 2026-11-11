@@ -101,6 +101,26 @@
   .pool-item:last-child{border-bottom:none;padding-bottom:0}
   .pool-item small{display:block;color:var(--muted);font-size:13px}
   .pool-item a{font-size:13px;color:var(--ink)}
+  .pool-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px}
+  .chip{font:inherit;font-size:13px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:5px 11px;cursor:pointer;color:var(--ink);white-space:nowrap}
+  .chip:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .pload{display:flex;gap:10px;align-items:center;font-size:14px;padding:10px 0 2px}
+  .pload b{font-variant-numeric:tabular-nums;margin-right:auto}
+  .spin{width:20px;height:20px;border:3px solid var(--line);border-top-color:var(--a);border-radius:50%;animation:spin .8s linear infinite;flex:none}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation-duration:2.5s}}
+  .pbar{height:6px;background:#ece6d8;border-radius:6px;overflow:hidden;margin:8px 0 4px}
+  .pbar i{display:block;height:100%;width:0;background:var(--a);transition:width .4s}
+  .rc{display:grid;grid-template-columns:52px 1fr;gap:12px;align-items:start;padding:14px 0;border-bottom:1px solid #f0ece2;font-size:15px;line-height:1.5}
+  .rc:last-of-type{border-bottom:none}
+  .pair{display:flex;padding-top:2px}
+  .pair .pm{width:30px;height:30px;font-size:13px}
+  .pair .pm+.pm{margin-right:-10px}
+  .rc small{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+  .rc a{display:inline-block;margin-top:6px;font-size:13px;color:var(--ink);background:#fff;border:1px solid var(--line);padding:4px 9px;border-radius:9px;text-decoration:none}
+  body.focus #formSec, body.focus #mapSec, body.focus #results > .card:not(#pool){display:none}
+  body.focus main{grid-template-columns:minmax(0,640px);grid-template-areas:"res";justify-content:center}
+  body.focus #results{display:block}
   .pk{width:24px;height:24px;border-radius:50%;background:#fff;border:3px solid;display:grid;place-items:center;font-size:12px;box-shadow:0 2px 6px #0003}
   footer{text-align:center;color:var(--muted);font-size:12px;padding:0 18px 24px}
   footer a{color:inherit}
@@ -163,8 +183,12 @@
         </details>
       </div>
       <div class="card" id="pool">
-        <h3>🤝 נוסעים ביחד?</h3>
+        <div class="pool-head"><h3>🤝 נוסעים ביחד?</h3><button class="chip" id="focusBtn" style="display:none">רק הטרמפים</button></div>
         <div id="poolList"></div>
+        <div class="share" id="poolShare" style="display:none">
+          <button class="btn wa" id="poolWa">שיתוף הטרמפים בוואטסאפ</button>
+          <button class="btn ghost" id="poolCopy">העתקה</button>
+        </div>
       </div>
   </section>
 </main>
@@ -627,7 +651,8 @@ async function computePool(k) {
     // Driver routes (also used by the map, cached). A failed route just drops that driver.
     const base = [];
     const driversAll = src.map((_, i) => i).filter(i => !src[i].ride);
-    for (const i of driversAll) { try { base[i] = await getRoute(src[i], R); } catch { base[i] = null; } if (!alive()) return; }
+    let doneSteps = 0; const steps = () => driversAll.length + 6;   // routes + matrices/names (rough)
+    for (const i of driversAll) { try { base[i] = await getRoute(src[i], R); } catch { base[i] = null; } if (!alive()) return; setProg(k, ent, ++doneSteps / steps() * 0.75); }
     const drivers = driversAll.filter(i => base[i]);
     // Few big matrices instead of one per driver: dests = people, R, then ~10 samples per driver.
     const PER = 10, perTable = Math.max(1, Math.floor((OSRM_MAX_COORDS - P - 1) / PER));
@@ -640,6 +665,7 @@ async function computePool(k) {
       let dur;
       try { ({ dur } = await osrmMatrix(src, [...src, R, ...smp])); } catch (e) { lastErr = e; if (!alive()) return; continue; }
       if (!alive()) return;
+      setProg(k, ent, 0.75 + 0.15 * (batches.indexOf(batch) + 1) / batches.length);
       if (!T) { T = dur; tR = src.map((_, i) => dur[i][P]); }
       for (const d of batch) {
         for (let p = 0; p < P; p++) {
@@ -695,7 +721,8 @@ async function computePool(k) {
     }
     cand.filter(c => !src[c.p].ride && !c.fallback).sort(bySaving).forEach(tryAdd);
     plan.forEach(m => { if (m.kind === "door") m.order = doors[m.d].indexOf(m.p); });
-    for (const m of plan) if (m.kind === "route" && m.idx > 0) { m.where = await areaName(m.x); if (!alive()) return; }
+    const named = plan.filter(m => m.kind === "route" && m.idx > 0);
+    for (const [n, m] of named.entries()) { m.where = await areaName(m.x); if (!alive()) return; setProg(k, ent, 0.9 + 0.1 * (n + 1) / named.length); }
     ent.plan = plan; ent.state = "done";
   } catch (e) { console.warn("carpool", e); if (pool[k] === ent) { ent.state = "error"; ent.err = String(e?.message || e).slice(0, 60); } }
   if (!alive()) return;
@@ -728,37 +755,85 @@ function poolLines(ent, b, t = x => x) {
       const main = `${nm(m.p)} עולה לרכב של ${nm(m.d)} כבר מהבית.`;
       let sub = m.extra < 60 ? "כמעט בלי סיבוב, ונוסעים ביחד כל הדרך." : `סיבוב של ${mins(m.extra)} דק׳ ל${src[m.d].name}, ובתמורה נוסעים ביחד כל הדרך.`;
       if (m.over) sub += " יותר ממה שנחשב סביר, אבל ככה כולם מגיעים 🙃";
-      out.push({ main, sub });
+      out.push({ main, sub, d: m.d, p: m.p });
     } else {
       const main = `${nm(m.p)} ו${nm(m.d)} נפגשים ${m.idx > 0 ? t(m.where) : "אצל " + nm(m.d)}, ומשם ממשיכים ברכב אחד.`;
       let sub = `${mins(m.leg)} דק׳ נסיעה עד שם ל${src[m.p].name}.`;
       if (m.overlap >= OVERLAP) sub += ` המסלולים שלכם חופפים ב-${Math.round(m.overlap * 100)}% מהדרך.`;
       if (m.extra >= 60) sub += ` זה מוסיף ל${src[m.p].name} ${mins(m.extra)} דק׳ לדרך.`;
-      out.push({ main, sub, x: m.x });
+      out.push({ main, sub, x: m.x, d: m.d, p: m.p });
     }
   }
-  for (const p of ent.none) out.push({ main: `לא מצאנו מי ייקח את ${nm(p)}.`, sub: "אולי מישהו מתנדב?" });
+  for (const p of ent.none) out.push({ main: `לא מצאנו מי ייקח את ${nm(p)}.`, sub: "אולי מישהו מתנדב?", p });
   return out;
+}
+function setProg(k, ent, v) {
+  ent.prog = Math.min(0.99, Math.max(ent.prog || 0, v));
+  if (k !== mode || pool[k] !== ent) return;
+  const bar = $("#poolBar"), pct = $("#poolPct");
+  if (bar) bar.style.width = (ent.prog * 100).toFixed(0) + "%";
+  if (pct) pct.textContent = Math.round(ent.prog * 100) + "%";
+}
+function pair(l) {
+  const src = results.src, dot = i => `<span class="pm" style="background:${personColor(src[i], i)}">${esc(initial(src[i].name))}</span>`;
+  return `<div class="pair" aria-hidden="true">${dot(l.p)}${l.d != null ? dot(l.d) : ""}</div>`;
 }
 function renderPool() {
   const box = $("#pool"), list = $("#poolList"), ent = pool[mode];
+  const done = ent?.state === "done";
+  $("#poolShare").style.display = "none";
+  $("#focusBtn").style.display = done || document.body.classList.contains("focus") ? "" : "none";
   if (!ent) {
     box.style.display = results ? "block" : "none";
     list.innerHTML = `<div class="pool-item"><small>נבדוק למי המסלולים מתלכדים ומי יכול לאסוף את מי.</small><button class="btn" id="poolGo" style="margin-top:8px;width:100%">מצאו לנו טרמפים</button></div>`;
     $("#poolGo").onclick = () => computePool(mode);
     return;
   }
-  if (ent.state !== "done") {
-    box.style.display = "block";
-    list.innerHTML = `<div class="pool-item"><small>${ent.state === "loading" ? "בודקים מי יכול לנסוע עם מי… זה לוקח כמה שניות." : "שרת המסלולים לא ענה" + (ent.err ? ` (${esc(ent.err)})` : "") + "."}</small>${ent.state === "error" ? `<button class="btn ghost" id="poolGo" style="margin-top:8px;width:100%">לנסות שוב</button>` : ""}</div>`;
-    if ($("#poolGo")) $("#poolGo").onclick = () => computePool(mode);
+  box.style.display = "block";
+  if (ent.state === "loading") {
+    list.innerHTML = `<div class="pload" role="status"><span class="spin"></span><span>בודקים מי יכול לנסוע עם מי. זה יכול לקחת עד 2 דקות…</span><b id="poolPct">${Math.round((ent.prog || 0) * 100)}%</b></div><div class="pbar"><i id="poolBar" style="width:${(ent.prog || 0) * 100}%"></i></div>`;
+    return;
+  }
+  if (ent.state === "error") {
+    list.innerHTML = `<div class="pool-item"><small>שרת המסלולים לא ענה${ent.err ? ` (${esc(ent.err)})` : ""}.</small><button class="btn ghost" id="poolGo" style="margin-top:8px;width:100%">לנסות שוב</button></div>`;
+    $("#poolGo").onclick = () => computePool(mode);
     return;
   }
   const lines = poolLines(ent, s => `<b>${esc(s)}</b>`, esc);
-  box.style.display = "block";
   if (!lines.length) { list.innerHTML = `<div class="pool-item"><small>הפעם אין טרמפ שמשתלם. כל אחד בא עם הרכב שלו.</small></div>`; return; }
-  list.innerHTML = lines.map(l => `<div class="pool-item">${l.main}<small>${esc(l.sub)}</small>${l.x ? `<a target="_blank" href="${wazeUrl(l.x)}">🚗 Waze לנקודת האיסוף</a>` : ""}</div>`).join("");
+  list.innerHTML = lines.map(l => `<div class="rc">${pair(l)}<div>${l.main}<small>${esc(l.sub)}</small>${l.x ? `<a target="_blank" href="${wazeUrl(l.x)}">🚗 Waze לנקודת האיסוף</a>` : ""}</div></div>`).join("");
+  $("#poolShare").style.display = "";
 }
+$("#focusBtn").onclick = () => {
+  const on = document.body.classList.toggle("focus");
+  $("#focusBtn").textContent = on ? "חזרה למפה" : "רק הטרמפים";
+  $("#pool").scrollIntoView({ behavior: "smooth", block: "start" });
+  if (!on) setTimeout(() => map.resize(), 50);
+};
+async function poolShareText() {
+  const R = results[mode], ent = pool[mode];
+  const [name, link] = await Promise.all([placeName(R), shortUrl(location.href)]);
+  return [
+    "🤝 מי נוסע עם מי למפגש",
+    `📍 נפגשים ליד ${name}`, `🚗 ${wazeUrl(R)}`, "",
+    ...poolLines(ent, n => `*${n}*`).flatMap(l => [`• ${l.main}`, `   ${l.sub}`, ...(l.x ? [`   📍 ${wazeUrl(l.x)}`] : []), ""]),
+    "📊 המפה עם כל המסלולים:", link, "",
+    "רוצים לבדוק בעצמכם? כנסו ל-" + siteUrl()
+  ].join("\n");
+}
+$("#poolWa").onclick = async () => {
+  const w = window.open("", "_blank");
+  const url = "https://wa.me/?text=" + encodeURIComponent(await poolShareText());
+  if (w) w.location.href = url; else location.href = url;
+};
+$("#poolCopy").onclick = async () => {
+  try {
+    const p = poolShareText();
+    if (window.ClipboardItem) await navigator.clipboard.write([new ClipboardItem({ "text/plain": p.then(t => new Blob([t], { type: "text/plain" })) })]);
+    else await navigator.clipboard.writeText(await p);
+    toast("הטרמפים הועתקו ✔");
+  } catch { toast("לא הצלחנו להעתיק, נסו את כפתור הוואטסאפ"); }
+};
 const wazeUrl = R => `https://waze.com/ul?ll=${R.lat.toFixed(5)},${R.lon.toFixed(5)}`;
 const gmapsUrl = R => `https://www.google.com/maps/search/?api=1&query=${R.lat.toFixed(6)},${R.lon.toFixed(6)}`;
 
