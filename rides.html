@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>מי נוסע עם מי — מפגש פסגה</title>
+<meta name="description" content="מי אוסף את מי בדרך למפגש.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  /* Same tokens as index.html */
+  :root{--bg:#f6f3ec;--ink:#1d2a2a;--muted:#6b7672;--card:#fffdf8;--line:#e3ddcf;--a:#e0592a}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Rubik,system-ui,sans-serif}
+  .wrap{max-width:620px;margin:auto;padding:18px 16px 30px}
+  .brand{font-size:15px;font-weight:800;color:var(--ink);text-decoration:none}
+  .brand span{color:var(--a)}
+  h1{margin:14px 0 2px;font-size:28px;font-weight:800;letter-spacing:-.5px}
+  .where{color:var(--muted);font-size:15px;margin:0 0 14px;line-height:1.5}
+  .where a{color:var(--ink)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:4px 16px}
+  .rc{display:grid;grid-template-columns:52px 1fr;gap:12px;align-items:start;padding:16px 0;border-bottom:1px solid #f0ece2;font-size:16px;line-height:1.5}
+  .rc:last-child{border-bottom:none}
+  .pair{display:flex;padding-top:2px}
+  .pm{width:32px;height:32px;border-radius:50%;color:#fff;font-weight:700;display:grid;place-items:center;font-size:14px;border:2px solid #fff;box-shadow:0 2px 6px #0003}
+  .pm+.pm{margin-right:-10px}
+  .rc small{display:block;color:var(--muted);font-size:14px;margin-top:3px}
+  .rc a{display:inline-block;margin-top:8px;font-size:14px;color:var(--ink);background:#fff;border:1px solid var(--line);padding:5px 10px;border-radius:9px;text-decoration:none}
+  .btn{display:block;text-align:center;font-weight:700;border-radius:12px;padding:13px 16px;margin-top:14px;text-decoration:none;font-size:16px;background:var(--ink);color:#fff}
+  .btn.ghost{background:transparent;color:var(--ink);border:1.5px dashed var(--line)}
+  .empty{padding:18px 0;color:var(--muted)}
+  a:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  footer{text-align:center;color:var(--muted);font-size:12px;padding:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="brand" href="./">מפגש <span>פסגה</span> ⛰️</a>
+  <h1>🤝 מי נוסע עם מי</h1>
+  <p class="where" id="where"></p>
+  <div class="card" id="list"></div>
+  <a class="btn" id="full" href="./">לכל המפה והמסלולים</a>
+  <a class="btn ghost" href="./">רוצים לבדוק בעצמכם? למפגש פסגה</a>
+</div>
+<footer>© כל הזכויות שמורות להלל בנבג'י</footer>
+<script>
+"use strict";
+// Hash = everything already computed on the main page, so this page needs no routing server.
+// {n:[[name,lat,lon]], r:[ride indices], m:mode, pt:[lat,lon,name],
+//  c:[[kind(0 door|1 route),p,d,extraSec,legSec,overlap%,lat,lon,where,over]], no:[p]}
+const COLORS = ["#e0592a","#2a7f6f","#6b4fbb","#d1912a","#c2366d","#2f6db5","#5d8a2b","#a0522d","#127a8a","#8a3fa0"];
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const b64e = s => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const b64d = s => decodeURIComponent(escape(atob(s.replace(/-/g, "+").replace(/_/g, "/"))));
+const mins = s => Math.max(1, Math.round(s / 60));
+const waze = (lat, lon) => `https://waze.com/ul?ll=${(+lat).toFixed(5)},${(+lon).toFixed(5)}`;
+
+let D = null;
+try { D = JSON.parse(b64d(location.hash.slice(1))); } catch {}
+if (!D || !D.n) {
+  $("h1").textContent = "הקישור לא שלם";
+  $("#where").textContent = "בקשו ממי ששלח לשלוח שוב, או חפשו נקודת מפגש בעצמכם.";
+  $("#list").style.display = $("#full").style.display = "none";
+} else render();
+
+function render() {
+  const name = i => (D.n[i][0] || "").trim();
+  const B = i => `<b>${esc(name(i))}</b>`;
+  const dot = i => `<span class="pm" style="background:${COLORS[i % COLORS.length]}">${esc(name(i).charAt(0) || "?")}</span>`;
+  const [plat, plon, pname] = D.pt;
+  $("#where").innerHTML = `בדרך למפגש ליד <b>${esc(pname || "הנקודה שבמפה")}</b> · <a target="_blank" href="${waze(plat, plon)}">Waze לנקודה</a>`;
+  const rows = (D.c || []).map(([k, p, d, extra, leg, ov, lat, lon, where, over]) => {
+    let main, sub;
+    if (k === 0) {
+      main = `${B(p)} עולה לרכב של ${B(d)} כבר מהבית.`;
+      sub = extra < 60 ? "כמעט בלי סיבוב, ונוסעים ביחד כל הדרך." : `סיבוב של ${mins(extra)} דק׳ ל${name(d)}, ובתמורה נוסעים ביחד כל הדרך.`;
+      if (over) sub += " יותר ממה שנחשב סביר, אבל ככה כולם מגיעים 🙃";
+    } else {
+      main = `${B(p)} ו${B(d)} נפגשים ${where ? esc(where) : "אצל " + B(d)}, ומשם ממשיכים ברכב אחד.`;
+      sub = `${mins(leg)} דק׳ נסיעה עד שם ל${name(p)}.`;
+      if (ov >= 90) sub += ` המסלולים שלכם חופפים ב-${ov}% מהדרך.`;
+      if (extra >= 60) sub += ` זה מוסיף ל${name(p)} ${mins(extra)} דק׳ לדרך.`;
+    }
+    return `<div class="rc"><div class="pair" aria-hidden="true">${dot(p)}${dot(d)}</div><div>${main}<small>${esc(sub)}</small>${k === 1 ? `<a target="_blank" href="${waze(lat, lon)}">🚗 Waze לנקודת האיסוף</a>` : ""}</div></div>`;
+  });
+  (D.no || []).forEach(p => rows.push(`<div class="rc"><div class="pair" aria-hidden="true">${dot(p)}</div><div>לא מצאנו מי ייקח את ${B(p)}.<small>אולי מישהו מתנדב?</small></div></div>`));
+  $("#list").innerHTML = rows.length ? rows.join("") : `<div class="empty">הפעם אין טרמפ שמשתלם. כל אחד בא עם הרכב שלו.</div>`;
+  // Full map link: same people/mode the main page understands.
+  const back = { p: D.n }; if (D.r) back.r = D.r; if (D.m === "fair") back.m = "fair";
+  $("#full").href = "./#" + b64e(JSON.stringify(back));
+}
+</script>
+</body>
+</html>

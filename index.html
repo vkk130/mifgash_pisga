@@ -865,7 +865,13 @@ async function poolShareText() {
   const names = ids.slice(0, 6).map(i => `*${src[i].name.trim()}*`);
   const more = ids.length - names.length;
   const who = more > 0 ? `${names.join(", ")} ועוד ${more}` : names.length > 1 ? `${names.slice(0, -1).join(", ")} ו${names[names.length - 1]}` : names[0];
-  const link = await shortUrl(siteUrl() + "#" + b64e(JSON.stringify({ ...hashData(), m: mode, v: "rides" })));
+  const R = results[mode];
+  const data = { n: hashData().p, m: mode, pt: [+R.lat.toFixed(5), +R.lon.toFixed(5), await placeName(R)],
+    c: ent.plan.map(m => [m.kind === "door" ? 0 : 1, m.p, m.d, Math.round(m.extra), Math.round(m.leg || 0), Math.round((m.overlap || 0) * 100),
+      m.x ? +m.x.lat.toFixed(5) : 0, m.x ? +m.x.lon.toFixed(5) : 0, m.idx > 0 ? m.where : "", m.over ? 1 : 0]) };
+  const rr = hashData().r; if (rr) data.r = rr;
+  if (ent.none.length) data.no = ent.none;
+  const link = await shortUrl(siteUrl().replace(/index\.html$/, "") + "rides.html#" + b64e(JSON.stringify(data)));
   return [
     "🤝 מצאנו טרמפים למפגש!",
     `${who}: יש לכם עם מי לנסוע ביחד.`,

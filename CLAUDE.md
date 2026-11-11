@@ -4,7 +4,7 @@ Static Hebrew site: friends enter starting points, get the meeting point with th
 Live: https://vkk130.github.io/mifgash_pisga/ · Owner: Hillel (`vkk130`) · Read `docs/` only if the task needs it.
 
 ## Code
-Everything is in `index.html` (HTML+CSS+JS, no build, no backend, no keys). Jump with `grep -n "// ----------" index.html`.
+Everything is in `index.html` (HTML+CSS+JS, no build, no backend, no keys). `rides.html` = standalone rides-only page rendered from its hash (keep sentences in sync with `poolLines`). Jump with `grep -n "// ----------" index.html`.
 
 ## Rules
 - UI/message text: Hebrew, short, light, young (Pepper/Blink style), not cringe. Place names in Hebrew.
