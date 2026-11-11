@@ -80,8 +80,8 @@
   pre#preview{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;font:inherit;font-size:14px;background:#f6f3ec;border-radius:12px;padding:12px;margin-top:12px;line-height:1.6;display:none}
   .how{margin-top:14px;font-size:14px;color:var(--muted);line-height:1.6}
   .how summary{cursor:pointer;color:var(--ink);font-weight:500}
-  .pin{width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid #fff;box-shadow:0 3px 10px #0004;display:grid;place-items:center}
-  .pin span{transform:rotate(45deg);color:#fff;font-size:16px}
+  .pin{width:38px;height:50px;filter:drop-shadow(0 3px 4px #0005);cursor:default}
+  .pin svg{display:block}
   .pm{width:26px;height:26px;border-radius:50%;color:#fff;font-weight:700;display:grid;place-items:center;font-size:12px;border:2px solid #fff;box-shadow:0 2px 6px #0003;font-family:Rubik}
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:99}
   .toast.show{opacity:1}
@@ -174,8 +174,13 @@ const markers = {};
 let resultMarker = null;
 map.on("load", () => {
   map.addSource("lines", { type: "geojson", data: emptyFC() });
-  map.addLayer({ id: "lines", type: "line", source: "lines",
-    paint: { "line-color": ["get", "c"], "line-width": 2.5, "line-dasharray": [2, 1.5], "line-opacity": .8 } });
+  map.addLayer({ id: "lines-casing", type: "line", source: "lines", layout: { "line-join": "round", "line-cap": "round" },
+    paint: { "line-color": "#fff", "line-width": ["interpolate", ["linear"], ["zoom"], 7, 5, 13, 9], "line-opacity": ["case", ["==", ["get", "road"], 1], 0.95, 0] } });
+  map.addLayer({ id: "lines", type: "line", source: "lines", layout: { "line-join": "round", "line-cap": "round" },
+    paint: { "line-color": ["get", "c"], "line-width": ["interpolate", ["linear"], ["zoom"], 7, 3, 13, 5.5],
+             "line-opacity": ["case", ["==", ["get", "road"], 1], 1, 0] } });
+  map.addLayer({ id: "lines-pending", type: "line", source: "lines", filter: ["==", ["get", "road"], 0],
+    paint: { "line-color": ["get", "c"], "line-width": 2, "line-dasharray": [1, 2], "line-opacity": 0.6 } });
   if (results) drawResult();
 });
 map.on("click", e => {
@@ -436,19 +441,49 @@ async function showResults() {
   writeHash();
   updatePreview();
 }
-function drawResult() {
+const routeCache = {};
+let drawToken = 0;
+function personColor(p, i) { const k = people.findIndex(x => x.id === p.id); return color(k < 0 ? i : k); }
+function setLines(R, geoms) {
+  map.getSource("lines").setData({ type: "FeatureCollection", features: results.src.map((p, i) => ({
+    type: "Feature", properties: { c: personColor(p, i), road: geoms[i] ? 1 : 0 },
+    geometry: { type: "LineString", coordinates: geoms[i] || [[p.lon, p.lat], [R.lon, R.lat]] } })) });
+}
+async function drawResult() {
   if (!results || !map.getSource("lines")) return;
+  const token = ++drawToken;
   const R = results[mode];
   const c = mode === "sum" ? "#e0592a" : "#2a7f6f";
   if (!resultMarker) {
-    const el = document.createElement("div"); el.className = "pin"; el.innerHTML = "<span>⛰️</span>";
+    const el = document.createElement("div"); el.className = "pin";
+    el.innerHTML = '<svg width="38" height="50" viewBox="-3 -3 42 54"><path d="M18 0C8 0 0 8 0 18c0 13.5 18 30 18 30s18-16.5 18-30C36 8 28 0 18 0z" stroke="#fff" stroke-width="3"/><circle cx="18" cy="18" r="6.5" fill="#fff"/></svg>';
     resultMarker = new maplibregl.Marker({ element: el, anchor: "bottom" }).setLngLat([R.lon, R.lat]).addTo(map);
   }
   resultMarker.setLngLat([R.lon, R.lat]);
-  resultMarker.getElement().style.background = c;
-  map.getSource("lines").setData({ type: "FeatureCollection", features: results.src.map(p => ({
-    type: "Feature", properties: { c }, geometry: { type: "LineString", coordinates: [[p.lon, p.lat], [R.lon, R.lat]] } })) });
+  resultMarker.getElement().querySelector("path").setAttribute("fill", c);
+  const keyOf = p => `${p.lat.toFixed(5)},${p.lon.toFixed(5)}>${R.lat.toFixed(5)},${R.lon.toFixed(5)}`;
+  const geoms = results.src.map(p => routeCache[keyOf(p)] || null);
+  setLines(R, geoms);
   fitAll([R.lon, R.lat]);
+  for (let i = 0; i < results.src.length; i++) {
+    if (geoms[i]) continue;
+    const p = results.src[i];
+    try {
+      const g = await osrmRoute(p, R);
+      if (token !== drawToken) return;
+      routeCache[keyOf(p)] = geoms[i] = g;
+      setLines(R, geoms);
+    } catch { if (token !== drawToken) return; }
+  }
+}
+async function osrmRoute(a, b) {
+  const wait = 1100 - (Date.now() - lastCall);
+  if (wait > 0) await sleep(wait);
+  lastCall = Date.now();
+  const r = await fetch(`https://router.project-osrm.org/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=full&geometries=geojson`);
+  const j = await r.json();
+  if (j.code !== "Ok") throw new Error(j.code);
+  return j.routes[0].geometry.coordinates;
 }
 const wazeUrl = R => `https://waze.com/ul?ll=${R.lat.toFixed(6)},${R.lon.toFixed(6)}&navigate=yes`;
 const gmapsUrl = R => `https://www.google.com/maps/search/?api=1&query=${R.lat.toFixed(6)},${R.lon.toFixed(6)}`;
