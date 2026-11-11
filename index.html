@@ -858,15 +858,20 @@ $("#focusBtn").onclick = () => {
   $("#pool").scrollIntoView({ behavior: "smooth", block: "start" });
   if (!on) setTimeout(() => map.resize(), 50);
 };
+// Short message: who got a ride suggestion + a link that opens straight into the rides view.
 async function poolShareText() {
-  const R = results[mode], ent = pool[mode];
-  const [name, link] = await Promise.all([placeName(R), shortUrl(location.href)]);
+  const ent = pool[mode], src = results.src;
+  const ids = [...new Set(ent.plan.flatMap(m => [m.p, m.d]))];
+  const names = ids.slice(0, 6).map(i => `*${src[i].name.trim()}*`);
+  const more = ids.length - names.length;
+  const who = more > 0 ? `${names.join(", ")} ועוד ${more}` : names.length > 1 ? `${names.slice(0, -1).join(", ")} ו${names[names.length - 1]}` : names[0];
+  const link = await shortUrl(siteUrl() + "#" + b64e(JSON.stringify({ ...hashData(), m: mode, v: "rides" })));
   return [
-    "🤝 מי נוסע עם מי למפגש",
-    `📍 נפגשים ליד ${name}`, `🚗 ${wazeUrl(R)}`, "",
-    ...poolLines(ent, n => `*${n}*`).flatMap(l => [`• ${l.main}`, `   ${l.sub}`, ...(l.x ? [`   📍 ${wazeUrl(l.x)}`] : []), ""]),
-    "📊 המפה עם כל המסלולים:", link, "",
-    "רוצים לבדוק בעצמכם? כנסו ל-" + siteUrl()
+    "🤝 מצאנו טרמפים למפגש!",
+    `${who}: יש לכם עם מי לנסוע ביחד.`,
+    "",
+    "מי נוסע עם מי ואיפה נפגשים בדרך:",
+    link
   ].join("\n");
 }
 $("#poolWa").onclick = async () => {
@@ -879,7 +884,7 @@ $("#poolCopy").onclick = async () => {
     const p = poolShareText();
     if (window.ClipboardItem) await navigator.clipboard.write([new ClipboardItem({ "text/plain": p.then(t => new Blob([t], { type: "text/plain" })) })]);
     else await navigator.clipboard.writeText(await p);
-    toast("הטרמפים הועתקו ✔");
+    toast("ההודעה הועתקה ✔");
   } catch { toast("לא הצלחנו להעתיק, נסו את כפתור הוואטסאפ"); }
 };
 const wazeUrl = R => `https://waze.com/ul?ll=${R.lat.toFixed(5)},${R.lon.toFixed(5)}`;
@@ -998,12 +1003,14 @@ $("#shareCopy").onclick = async () => {
 };
 
 // ---------- link state ----------
-function writeHash() {
+function hashData() {
   const data = { p: results.src.map(p => [p.name, +p.lat.toFixed(4), +p.lon.toFixed(4)]) };
   const r = results.src.map((p, i) => p.ride ? i : -1).filter(i => i >= 0);
   if (r.length) data.r = r;
-  history.replaceState(null, "", "#" + b64e(JSON.stringify(data)));
+  return data;
 }
+function writeHash() { history.replaceState(null, "", "#" + b64e(JSON.stringify(hashData()))); }
+let openRides = false;
 function readHash() {
   if (location.hash.length < 3) return false;
   try {
@@ -1011,6 +1018,7 @@ function readHash() {
     const rides = new Set(data.r || []);
     data.p.slice(0, MAX_PEOPLE).forEach(([name, lat, lon, addr], i) => addPerson({ name, lat, lon, addr: addr || "נקודה במפה", ride: rides.has(i) }));
     if (data.m === "fair") mode = "fair";
+    openRides = data.v === "rides";
     return true;
   } catch { return false; }
 }
@@ -1025,7 +1033,13 @@ function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.ad
 // ---------- boot ----------
 if (readHash()) {
   syncMarkers(); fitAll();
-  const m = mode; runCalc().then(() => { mode = m; if (results) showResults(); });
+  const m = mode;
+  if (openRides) {   // shared rides link: open straight into the rides view, with a spinner until it's ready
+    document.body.classList.add("focus"); $("#focusBtn").textContent = "חזרה למפה";
+    $("#results").style.display = "block"; $("#pool").style.display = "block";
+    $("#poolList").innerHTML = `<div class="pload" role="status"><span class="spin"></span><span>טוענים את הטרמפים. זה יכול לקחת עד 2 דקות…</span></div>`;
+  }
+  runCalc().then(() => { mode = m; if (!results) return; showResults(); if (openRides) computePool(mode); });
 } else {
   addPerson(); addPerson(); addPerson();
 }
