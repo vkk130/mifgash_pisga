@@ -285,7 +285,7 @@ $("#people").addEventListener("click", e => {
   if (ride) {
     const p = people.find(x => x.id == ride); p.ride = !p.ride; renderPeople();
     const s = results?.src.find(x => x.id === p.id);
-    if (s) { s.ride = p.ride; pool = { sum: null, fair: null }; sharePromise = null; writeHash(); computePool(mode); }
+    if (s) { s.ride = p.ride; const was = pool[mode]; pool = { sum: null, fair: null }; sharePromise = null; writeHash(); if (was) computePool(mode); else renderPool(); }
   }
   if (del) { people = people.filter(p => p.id != del); renderPeople(); syncMarkers(); }
   if (pick) setPicking(picking == pick ? null : +pick);
@@ -391,6 +391,21 @@ function osrmSlot() {
   const slot = osrmQueue.then(async () => { const w = 1100 - (Date.now() - lastCall); if (w > 0) await sleep(w); lastCall = Date.now(); });
   osrmQueue = slot.catch(() => {});
   return slot;
+}
+// Matrix where dests may include the sources themselves (no duplicated coords). Durations only.
+async function osrmMatrix(srcs, dests) {
+  const coords = dests;   // srcs must be the first srcs.length entries of dests
+  const url = `${OSRM}${coords.map(p => `${p.lon.toFixed(6)},${p.lat.toFixed(6)}`).join(";")}?sources=${srcs.map((_, i) => i).join(";")}&annotations=duration`;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await osrmSlot();
+      const r = await fetch(url);
+      if (r.status === 429) throw new Error("השרת עמוס (429)");
+      const j = await r.json();
+      if (j.code !== "Ok") throw new Error(j.message || j.code);
+      return { dur: j.durations };
+    } catch (e) { if (attempt === 3) throw e; await sleep(2500 * (attempt + 1)); }
+  }
 }
 async function osrmTable(srcs, dests, ann = "distance") {
   const coords = [...srcs, ...dests].map(p => `${p.lon.toFixed(6)},${p.lat.toFixed(6)}`).join(";");
@@ -499,7 +514,7 @@ async function showResults() {
   $("#table").innerHTML = order.map(o => `<tr><td>${esc(o.p.name)}<div class="quip">${esc(funnyLine(o.d))}</div><div class="bar" style="width:${Math.max(4, 100 * o.d / maxD)}%;background:${color(people.findIndex(x => x.id === o.p.id) < 0 ? o.i : people.findIndex(x => x.id === o.p.id))}"></div></td><td class="km">${km(o.d)} ק״מ</td></tr>`).join("");
   $("#totals").innerHTML = `<span>סך הכל: <b>${km(R.sum)} ק״מ</b></span><span>הכי רחוק: <b>${km(R.max)} ק״מ</b></span><span>פער: <b>${km(R.max - Math.min(...R.d))} ק״מ</b></span>`;
   drawResult();
-  if (!pool[mode]) computePool(mode); else renderPool();
+  renderPool();
   if (!sharePromise) { writeHash(); prepareShare(); }
 }
 let drawToken = 0;
@@ -609,46 +624,52 @@ async function computePool(k) {
   const alive = () => pool[k] === ent && results?.[k] === R;
   if (k === mode) renderPool();
   try {
+    // Driver routes (also used by the map, cached). A failed route just drops that driver.
     const base = [];
-    for (let i = 0; i < P; i++) { try { base[i] = await getRoute(src[i], R); } catch { base[i] = null; } if (!alive()) return; }
-    const has = i => !!base[i];
-    const drivers = src.map((_, i) => i).filter(i => !src[i].ride && has(i));
+    const driversAll = src.map((_, i) => i).filter(i => !src[i].ride);
+    for (const i of driversAll) { try { base[i] = await getRoute(src[i], R); } catch { base[i] = null; } if (!alive()) return; }
+    const drivers = driversAll.filter(i => base[i]);
+    // Few big matrices instead of one per driver: dests = people, R, then ~10 samples per driver.
+    const PER = 10, perTable = Math.max(1, Math.floor((OSRM_MAX_COORDS - P - 1) / PER));
+    const batches = [];
+    for (let b = 0; b < Math.max(1, drivers.length); b += perTable) batches.push(drivers.slice(b, b + perTable));
     const cand = [];
-    let T = null, okTables = 0;   // person→person seconds
-    const nS = Math.min(POOL_SAMPLES, OSRM_MAX_COORDS - 2 * P);
-    for (const d of drivers) {
-      const smp = routeSamples(base[d], nS);
+    let T = null, tR = null, lastErr = null;
+    for (const batch of batches) {
+      const smp = batch.flatMap(d => routeSamples(base[d], PER).map(x => ({ ...x, d })));
       let dur;
-      try { ({ dur } = await osrmTable(src, [...src, ...smp], "duration")); } catch { if (!alive()) return; continue; }
+      try { ({ dur } = await osrmMatrix(src, [...src, R, ...smp])); } catch (e) { lastErr = e; if (!alive()) return; continue; }
       if (!alive()) return;
-      T = T || dur;
-      okTables++;
-      for (let p = 0; p < P; p++) {
-        if (p === d || !has(p)) continue;
-        const tp = base[p].dur, td = base[d].dur, opts = [];
-        const dx = dur[d][p];
-        if (dx != null) {
-          const extra = Math.max(0, dx + tp - td);
-          opts.push({ kind: "door", extra, who: "d", ok: extra <= detourLimit(td), s: tp - extra });
+      if (!T) { T = dur; tR = src.map((_, i) => dur[i][P]); }
+      for (const d of batch) {
+        for (let p = 0; p < P; p++) {
+          if (p === d || tR[p] == null || tR[d] == null) continue;
+          const tp = tR[p], td = tR[d], opts = [];
+          const dx = dur[d][p];
+          if (dx != null) {
+            const extra = Math.max(0, dx + tp - td);
+            opts.push({ kind: "door", extra, who: "d", ok: extra <= detourLimit(td), s: tp - extra });
+          }
+          smp.forEach((x, j) => {
+            if (x.d !== d) return;
+            const tpx = dur[p][P + 1 + j]; if (tpx == null || !tp) return;
+            const extra = Math.max(0, tpx + x.rem - tp);
+            const overlap = Math.min(1, x.rem / tp);
+            opts.push({ kind: "route", x, idx: x.idx, leg: tpx, extra, overlap, who: "p", ok: extra <= detourLimit(tp) || (overlap >= OVERLAP && extra <= 1200), s: tp - tpx });
+          });
+          const minGain = src[p].ride ? 0 : Math.max(300, 0.3 * tp);   // don't suggest "drive alone 40 min to share the last 5"
+          opts.filter(o => o.ok && o.s >= minGain).forEach(o => cand.push({ ...o, d, p }));
+          if (src[p].ride) { const fb = opts.filter(o => o.kind === "door").sort((a, b) => a.extra - b.extra)[0]; if (fb) cand.push({ ...fb, d, p, over: !fb.ok, fallback: true }); }
         }
-        smp.forEach((x, j) => {
-          const tpx = dur[p][P + j]; if (tpx == null) return;
-          const extra = Math.max(0, tpx + x.rem - tp);
-          const overlap = Math.min(1, x.rem / tp);
-          opts.push({ kind: "route", x, idx: x.idx, leg: tpx, extra, overlap, who: "p", ok: extra <= detourLimit(tp) || (overlap >= OVERLAP && extra <= 1200), s: tp - tpx });
-        });
-        const minGain = src[p].ride ? 0 : Math.max(300, 0.3 * tp);   // don't suggest "drive alone 40 min to share the last 5"
-        opts.filter(o => o.ok && o.s >= minGain).forEach(o => cand.push({ ...o, d, p }));
-        if (src[p].ride) { const fb = opts.filter(o => o.kind === "door").sort((a, b) => a.extra - b.extra)[0]; if (fb) cand.push({ ...fb, d, p, over: !fb.ok, fallback: true }); }
       }
     }
-    if (drivers.length && !okTables) throw new Error("no tables");
+    if (!T) throw lastErr || new Error("no matrix");
     // greedy assignment
     const role = {}, doors = {}, routes = {}, plan = [];
     const chainExtra = (d, list) => {
       let t = 0, at = d;
       for (const q of list) { t += T[at][q] ?? 0; at = q; }
-      return t + base[at].dur - base[d].dur;
+      return t + tR[at] - tR[d];
     };
     const tryAdd = o => {
       if (role[o.p] || role[o.d] === "pas") return false;
@@ -657,7 +678,7 @@ async function computePool(k) {
         const cur = doors[o.d] || [];
         const next = [...cur, o.p].sort((a, b) => T[o.d][a] - T[o.d][b]);
         const before = cur.length ? chainExtra(o.d, cur) : 0, after = chainExtra(o.d, next);
-        if (!o.fallback && after > detourLimit(base[o.d].dur)) return false;
+        if (!o.fallback && after > detourLimit(tR[o.d])) return false;
         o.extra = Math.max(0, after - before);
         doors[o.d] = next;
       } else {
@@ -676,7 +697,7 @@ async function computePool(k) {
     plan.forEach(m => { if (m.kind === "door") m.order = doors[m.d].indexOf(m.p); });
     for (const m of plan) if (m.kind === "route" && m.idx > 0) { m.where = await areaName(m.x); if (!alive()) return; }
     ent.plan = plan; ent.state = "done";
-  } catch (e) { console.warn("carpool", e); if (pool[k] === ent) ent.state = "error"; }
+  } catch (e) { console.warn("carpool", e); if (pool[k] === ent) { ent.state = "error"; ent.err = String(e?.message || e).slice(0, 60); } }
   if (!alive()) return;
   if (k === mode) { renderPool(); refreshLines(); sharePromise = null; prepareShare(); }
   // Fetch the extra legs for the map (passenger → pickup, driver → door pickups).
@@ -721,14 +742,21 @@ function poolLines(ent, b, t = x => x) {
 }
 function renderPool() {
   const box = $("#pool"), list = $("#poolList"), ent = pool[mode];
-  if (!ent) { box.style.display = "none"; return; }
+  if (!ent) {
+    box.style.display = results ? "block" : "none";
+    list.innerHTML = `<div class="pool-item"><small>נבדוק למי המסלולים מתלכדים ומי יכול לאסוף את מי.</small><button class="btn" id="poolGo" style="margin-top:8px;width:100%">מצאו לנו טרמפים</button></div>`;
+    $("#poolGo").onclick = () => computePool(mode);
+    return;
+  }
   if (ent.state !== "done") {
     box.style.display = "block";
-    list.innerHTML = `<div class="pool-item"><small>${ent.state === "loading" ? "בודקים מי יכול לנסוע עם מי…" : "לא הצלחנו לבדוק טרמפים כרגע. נסו שוב עוד מעט."}</small></div>`;
+    list.innerHTML = `<div class="pool-item"><small>${ent.state === "loading" ? "בודקים מי יכול לנסוע עם מי… זה לוקח כמה שניות." : "שרת המסלולים לא ענה" + (ent.err ? ` (${esc(ent.err)})` : "") + "."}</small>${ent.state === "error" ? `<button class="btn ghost" id="poolGo" style="margin-top:8px;width:100%">לנסות שוב</button>` : ""}</div>`;
+    if ($("#poolGo")) $("#poolGo").onclick = () => computePool(mode);
     return;
   }
   const lines = poolLines(ent, s => `<b>${esc(s)}</b>`, esc);
-  box.style.display = lines.length ? "block" : "none";
+  box.style.display = "block";
+  if (!lines.length) { list.innerHTML = `<div class="pool-item"><small>הפעם אין טרמפ שמשתלם. כל אחד בא עם הרכב שלו.</small></div>`; return; }
   list.innerHTML = lines.map(l => `<div class="pool-item">${l.main}<small>${esc(l.sub)}</small>${l.x ? `<a target="_blank" href="${wazeUrl(l.x)}">🚗 Waze לנקודת האיסוף</a>` : ""}</div>`).join("");
 }
 const wazeUrl = R => `https://waze.com/ul?ll=${R.lat.toFixed(5)},${R.lon.toFixed(5)}`;
