@@ -25,3 +25,10 @@ JS is one `<script>` split by banner comments — grep `// ----------` to jump:
 - Be polite to the free public services (~1 request/second to OSRM; throttle via shared `lastCall`).
 - Verify JS syntax after edits: extract the `<script>` block and run `node --check`.
 - Commit, then push to `main` — Pages deploys automatically. Settings changes (Pages, etc.) can't be done from the agent session; ask Hillel.
+
+## Keep the docs current (required)
+Every change that lands on `main` must update the docs in the same commit:
+- `docs/PROGRESS.md` — add a numbered timeline line for what changed; move items in/out of "Not yet verified" as Hillel confirms or reports problems; update "Next steps" when Hillel states new plans.
+- `docs/ARCHITECTURE.md` — update when a decision, service, algorithm, data format (URL hash), or the share-message spec changes.
+- `CLAUDE.md` (this file) — update when files, `index.html` section names/functions, or Hillel's rules change.
+Write only what is known: no invented facts. If something is unknown, write "unknown" and ask Hillel.
