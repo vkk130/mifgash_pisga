@@ -70,6 +70,7 @@
   .nav a{font-size:14px;color:var(--ink);background:#fff;border:1px solid var(--line);padding:6px 10px;border-radius:9px;text-decoration:none}
   table{width:100%;border-collapse:collapse;font-size:15px}
   td{padding:8px 4px;border-bottom:1px solid #f0ece2}
+  .quip{font-size:13px;color:var(--muted);margin-top:2px}
   td.km{text-align:left;font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}
   .bar{height:6px;border-radius:4px;margin-top:4px}
   .totals{display:flex;gap:16px;margin-top:10px;font-size:14px;color:var(--muted);flex-wrap:wrap}
@@ -429,6 +430,7 @@ async function runCalc() {
   try {
     const best = await optimise(src, f => { $("#progress i").style.width = (f * 100) + "%"; });
     results = { src: src.map(p => ({ ...p })), sum: best.sum, fair: best.fair };
+    sharePromise = null;
     $("#status").textContent = "";
     writeHash();
     await showResults();
@@ -452,15 +454,15 @@ async function showResults() {
   const R = results[mode], src = results.src;
   const key = R.lat.toFixed(4) + "," + R.lon.toFixed(4);
   $("#place").textContent = placeNames[key] ? "📍 ליד " + placeNames[key] : "📍 מחפשים שם למקום…";
-  if (!placeNames[key]) reverseName(R.lat, R.lon, true).then(n => { placeNames[key] = n || "הנקודה שבמפה"; if (results[mode] === R) $("#place").textContent = "📍 ליד " + placeNames[key]; updatePreview(); });
+  if (!placeNames[key]) reverseName(R.lat, R.lon, true).then(n => { placeNames[key] = n || "הנקודה שבמפה"; if (results[mode] === R) $("#place").textContent = "📍 ליד " + placeNames[key]; });
   $("#nav").innerHTML = `<a target="_blank" href="${wazeUrl(R)}">🚗 Waze</a><a target="_blank" href="${gmapsUrl(R)}">🗺️ Google Maps</a>`;
   const maxD = Math.max(...R.d);
   const order = src.map((p, i) => ({ p, i, d: R.d[i] })).sort((a, b) => b.d - a.d);
-  $("#table").innerHTML = order.map(o => `<tr><td>${esc(o.p.name)}<div class="bar" style="width:${Math.max(4, 100 * o.d / maxD)}%;background:${color(people.findIndex(x => x.id === o.p.id) < 0 ? o.i : people.findIndex(x => x.id === o.p.id))}"></div></td><td class="km">${km(o.d)} ק״מ</td></tr>`).join("");
+  resetPools();
+  $("#table").innerHTML = order.map(o => `<tr><td>${esc(o.p.name)}<div class="quip">${esc(funnyLine(o.d))}</div><div class="bar" style="width:${Math.max(4, 100 * o.d / maxD)}%;background:${color(people.findIndex(x => x.id === o.p.id) < 0 ? o.i : people.findIndex(x => x.id === o.p.id))}"></div></td><td class="km">${km(o.d)} ק״מ</td></tr>`).join("");
   $("#totals").innerHTML = `<span>סך הכל: <b>${km(R.sum)} ק״מ</b></span><span>הכי רחוק: <b>${km(R.max)} ק״מ</b></span><span>פער: <b>${km(R.max - Math.min(...R.d))} ק״מ</b></span>`;
   drawResult();
-  writeHash();
-  updatePreview();
+  if (!sharePromise) { writeHash(); prepareShare(); }
 }
 const routeCache = {};
 let drawToken = 0;
@@ -562,56 +564,71 @@ function funnyLine(d) {
 }
 const siteUrl = () => location.origin + location.pathname;
 
-function shareText() {
-  resetPools();
-  const R = results[mode], src = results.src;
-  const key = R.lat.toFixed(4) + "," + R.lon.toFixed(4);
-  const order = src.map((p, i) => ({ p, d: R.d[i] })).sort((a, b) => b.d - a.d);
-  const why = mode === "sum"
-    ? `⚡ *הלכנו על הנקודה הכי קצרה ביחד*\nחיברנו את הקילומטרים של כולנו ובחרנו את הנקודה שבה הסכום הכי נמוך: ${km(R.sum)} ק״מ לכל החבר׳ה. טוב לקבוצה, קצת פחות למי שגר רחוק.`
-    : `⚖️ *הלכנו על הנקודה הכי הוגנת*\nבחרנו את הנקודה שבה מי שנוסע הכי הרבה נוסע כמה שפחות. ככה אף אחד לא סוחב את כל הנסיעה לבד, והכי רחוק זה ${km(R.max)} ק״מ.`;
+const nameKey = R => R.lat.toFixed(4) + "," + R.lon.toFixed(4);
+async function placeName(R) {
+  const k = nameKey(R);
+  if (!placeNames[k]) placeNames[k] = (await reverseName(R.lat, R.lon, true)) || "הנקודה שבמפה";
+  return placeNames[k];
+}
+// Short link via is.gd (JSONP, no key). Falls back to the long link.
+function shortUrl(long) {
+  return new Promise(res => {
+    const cb = "isgd" + Date.now();
+    const sc = document.createElement("script");
+    const done = v => { clearTimeout(t); delete window[cb]; sc.remove(); res(v); };
+    const t = setTimeout(() => done(long), 5000);
+    window[cb] = j => done(j && j.shorturl ? j.shorturl : long);
+    sc.onerror = () => done(long);
+    sc.src = `https://is.gd/create.php?format=json&callback=${cb}&url=${encodeURIComponent(long)}`;
+    document.head.appendChild(sc);
+  });
+}
+async function shareText() {
+  const S = results.sum, F = results.fair;
+  const [nS, nF, link] = await Promise.all([placeName(S), placeName(F), shortUrl(location.href)]);
+  const same = Math.abs(S.lat - F.lat) < 0.003 && Math.abs(S.lon - F.lon) < 0.003;
+  const pts = same
+    ? [`📍 *ליד ${nS}*`, `הפעם שתי השיטות הסכימו: זו גם הנקודה הכי קצרה לכולנו ביחד (${km(S.sum)} ק״מ סה״כ) וגם הכי הוגנת (אף אחד לא נוסע יותר מ-${km(F.max)} ק״מ).`]
+    : [`⚡ *הכי קצר ביחד: ליד ${nS}*`, `הנקודה שבה סך הקילומטרים של כולנו הכי נמוך: ${km(S.sum)} ק״מ.`, "",
+       `⚖️ *הכי הוגן: ליד ${nF}*`, `הנקודה שבה מי שנוסע הכי הרבה נוסע כמה שפחות: מקסימום ${km(F.max)} ק״מ.`];
   return [
     "⛰️ מצאנו איפה נפגשים!",
     "",
-    "📍 " + (placeNames[key] ? "ליד " + placeNames[key] : "הנקודה במפה"),
-    "🚗 ניווט: " + wazeUrl(R),
+    ...pts,
     "",
-    why,
-    "",
-    "*כמה כל אחד נוסע:*",
-    ...order.map(o => `• *${o.p.name.trim()}*: ${km(o.d)} ק״מ. ${funnyLine(o.d)}`),
-    "",
-    "איך זה עובד? מפגש פסגה בודק מאות נקודות על המפה, ומחשב לכל אחת את הנסיעה האמיתית בכביש מכל אחד מאיתנו.",
+    "📊 כמה כל אחד נוסע, ומפה עם המסלולים:",
+    link,
     "",
     "רוצים לבדוק בעצמכם? כנסו ל-" + siteUrl()
   ].join("\n");
 }
-let cachedText = "", cachedFor = "";
-function updatePreview() {
-  const R = results[mode];
-  const sig = mode + R.lat + placeNames[R.lat.toFixed(4) + "," + R.lon.toFixed(4)];
-  if (sig !== cachedFor) { cachedText = shareText(); cachedFor = sig; }
-}
-$("#shareWa").onclick = () => {
-  updatePreview();
-  window.open("https://wa.me/?text=" + encodeURIComponent(cachedText), "_blank");
+let sharePromise = null;
+function prepareShare() { sharePromise = shareText(); }
+$("#shareWa").onclick = async () => {
+  const w = window.open("", "_blank");
+  const text = await (sharePromise || shareText());
+  const url = "https://wa.me/?text=" + encodeURIComponent(text);
+  if (w) w.location.href = url; else location.href = url;
 };
 $("#shareCopy").onclick = async () => {
-  updatePreview();
-  try { await navigator.clipboard.writeText(cachedText); toast("ההודעה הועתקה ✔"); }
-  catch { toast("לא הצלחנו להעתיק, אפשר לסמן את הטקסט ולהעתיק ידנית"); }
+  try {
+    const p = sharePromise || shareText();
+    if (window.ClipboardItem) await navigator.clipboard.write([new ClipboardItem({ "text/plain": p.then(t => new Blob([t], { type: "text/plain" })) })]);
+    else await navigator.clipboard.writeText(await p);
+    toast("ההודעה הועתקה ✔");
+  } catch { toast("לא הצלחנו להעתיק, נסו את כפתור הוואטסאפ"); }
 };
 
 // ---------- link state ----------
 function writeHash() {
-  const data = { p: results.src.map(p => [p.name, +p.lat.toFixed(5), +p.lon.toFixed(5), p.addr]), m: mode };
+  const data = { p: results.src.map(p => [p.name, +p.lat.toFixed(4), +p.lon.toFixed(4)]) };
   history.replaceState(null, "", "#" + b64e(JSON.stringify(data)));
 }
 function readHash() {
   if (location.hash.length < 3) return false;
   try {
     const data = JSON.parse(b64d(location.hash.slice(1)));
-    data.p.slice(0, MAX_PEOPLE).forEach(([name, lat, lon, addr]) => addPerson({ name, lat, lon, addr }));
+    data.p.slice(0, MAX_PEOPLE).forEach(([name, lat, lon, addr]) => addPerson({ name, lat, lon, addr: addr || "נקודה במפה" }));
     if (data.m === "fair") mode = "fair";
     return true;
   } catch { return false; }

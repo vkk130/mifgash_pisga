@@ -10,6 +10,7 @@
 7. Map labels in Hebrew; Palestinian territories / West Bank / Gaza Strip labels hidden.
 8. Removed the share-message preview; added the math explanation to "איך זה עובד?"; added the rights footer; added these agent docs.
 9. Funny-line bank expanded to 12 lines per distance tier (84 total), gender-neutral; no line repeats within one message (`resetPools`/`funnyLine`).
+10. Share message slimmed down: both points + short (is.gd) link to the result page + site link. Funny lines moved to the results table on the site.
 
 ## Not yet verified in a real browser
 The agent environment can't reach the map/OSRM/Photon/Nominatim servers, so items 3–8 were only syntax-checked (`node --check`). Hillel's feedback is the test. Specifically unconfirmed:
@@ -17,6 +18,7 @@ The agent environment can't reach the map/OSRM/Photon/Nominatim servers, so item
 - Photon returning Hebrew names with `lang=default`.
 - OpenFreeMap tiles containing `name:he` for most labels; the Palestinian-label filter catching the right label.
 - Road routes drawing correctly.
+- is.gd shortening working from the browser (JSONP).
 
 ## Next steps (stated by Hillel)
 - Next MVP: suggest actual venues near the point using Hillel's places API (which API: not recorded).

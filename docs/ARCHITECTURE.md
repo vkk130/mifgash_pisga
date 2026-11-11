@@ -35,9 +35,11 @@ d_i(x) = OSRM road distance from person i to point x.
 - Throttle: ≥1.1 s between OSRM calls; retries on 429/errors.
 
 ## State & sharing
-- All state lives in the URL hash: base64url(JSON `{p:[[name,lat,lon,addr]...], m:"sum"|"fair"}`). Opening such a link re-runs the calculation.
-- The share message links to the site root (not the result hash) with "רוצים לבדוק בעצמכם? כנסו ל-…".
-- Share via `wa.me/?text=` or copy to clipboard. Names are WhatsApp-bold (`*name*`) in a bullet list.
+- All state lives in the URL hash: base64url(JSON `{p:[[name,lat,lon]...]}`), coords rounded to 4 decimals (older links with addr/`m` still load). Opening such a link re-runs the calculation (deterministic for the same input).
+- Share message (Hillel's spec): only the two points (fastest + fairest, merged into one if they're within ~300 m), each with a one-line explanation of how it was chosen; then a short link to the result page (per-person distances + routes); then "רוצים לבדוק בעצמכם? כנסו ל-<site root>". No per-person lines in the message.
+- The result link is shortened with is.gd (JSONP, no key, 5 s timeout, falls back to the long link). Hillel wants a normal-size link, not a huge one.
+- The funny lines (`BANK`) now appear on the site under each name in the results table, not in the message.
+- Share via `wa.me/?text=` (window opened synchronously, then navigated, to avoid popup blocking) or copy (ClipboardItem with a promise for iOS).
 
 ## Map rendering
 - Each person has a colour (`COLORS`, by index in `people`). Their route to the result is drawn along roads in that colour with a white casing; a dashed straight line shows until the route loads. Routes load one by one (rate limit) and are cached per (start, destination).
