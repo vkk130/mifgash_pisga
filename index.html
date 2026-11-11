@@ -77,7 +77,8 @@
   .share{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap}
   .share .btn{flex:1}
   .wa{background:#1fa855}
-  pre#preview{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;font:inherit;font-size:14px;background:#f6f3ec;border-radius:12px;padding:12px;margin-top:12px;line-height:1.6;display:none}
+  .math{direction:ltr;text-align:center;font-family:"Cambria Math","Times New Roman",serif;font-size:17px;color:var(--ink);background:#f6f3ec;border-radius:10px;padding:8px;margin:6px 0}
+  .copy{margin-top:6px}
   .how{margin-top:14px;font-size:14px;color:var(--muted);line-height:1.6}
   .how summary{cursor:pointer;color:var(--ink);font-weight:500}
   .pin{width:38px;height:50px;filter:drop-shadow(0 3px 4px #0005);cursor:default}
@@ -129,18 +130,24 @@
           <button class="btn wa" id="shareWa">שיתוף בוואטסאפ</button>
           <button class="btn ghost" id="shareCopy">העתקה</button>
         </div>
-        <details class="how"><summary>תצוגה מקדימה של ההודעה</summary><pre id="preview"></pre></details>
         <details class="how">
           <summary>איך זה עובד?</summary>
           <p>אנחנו פורשים רשת של מאות נקודות על המפה, ובודקים לכל אחת כמה כל אחד מכם צריך לנסוע אליה ברכב. בכביש, לא באוויר. אחר כך עושים זום על הנקודות הכי טובות ובודקים שוב, עד שנשארת אחת.</p>
           <p><b>הכי קצר ביחד:</b> הנקודה שבה סך הקילומטרים של כולם הכי נמוך. טובה לקבוצה, פחות למי שגר רחוק.</p>
           <p><b>הכי הוגן:</b> מי שנוסע הכי הרבה נוסע כמה שפחות. ככה אף אחד לא סוחב את כל הנסיעה לבד.</p>
+          <p><b>ובמתמטיקה:</b> נסמן ב-d<sub>i</sub>(x) את מרחק הנסיעה בכביש ממשתתף i לנקודה x.</p>
+          <p>הכי קצר ביחד מחפש את הנקודה שממזערת את הסכום (זה נקרא "חציון גיאומטרי", רק עם כבישים):</p>
+          <div class="math">x* = argmin<sub>x</sub> Σ<sub>i</sub> d<sub>i</sub>(x)</div>
+          <p>הכי הוגן מחפש את הנקודה שממזערת את המקסימום (בעיית minimax). אם יש תיקו, מכריע הסכום:</p>
+          <div class="math">x* = argmin<sub>x</sub> max<sub>i</sub> d<sub>i</sub>(x)</div>
+          <p>אין לזה נוסחה סגורה, כי מרחק בכביש תלוי ברשת הכבישים. לכן מחפשים ברשת: בסבב הראשון פורשים רשת ריבועית של n×n נקודות על האזור של כל המשתתפים (פלוס 10%), כאשר n = ⌊√(100 − P)⌋ ו-P הוא מספר המשתתפים. בכל אחד משלושת הסבבים הבאים פורשים רשת חדשה וצפופה יותר סביב הנקודה הטובה ביותר לכל אחת משתי השיטות, ברוחב של צעד אחד מהרשת הקודמת. כל נקודה מוצמדת לכביש הקרוב, והמרחקים מגיעים מ-OSRM.</p>
         </details>
       </div>
   </section>
 </main>
 
 <footer>
+  <div class="copy">© כל הזכויות שמורות להלל בנבג'י</div>
   מרחקי נסיעה: <a href="https://project-osrm.org" target="_blank">OSRM</a> · חיפוש: <a href="https://photon.komoot.io" target="_blank">Photon</a> ו-<a href="https://nominatim.org" target="_blank">Nominatim</a> · מפה: <a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>
 </footer>
 <div class="toast" id="toast"></div>
@@ -557,7 +564,6 @@ function updatePreview() {
   const R = results[mode];
   const sig = mode + R.lat + placeNames[R.lat.toFixed(4) + "," + R.lon.toFixed(4)];
   if (sig !== cachedFor) { cachedText = shareText(); cachedFor = sig; }
-  $("#preview").textContent = cachedText; $("#preview").style.display = "block";
 }
 $("#shareWa").onclick = () => {
   updatePreview();
