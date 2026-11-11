@@ -561,10 +561,17 @@ async function drawResult() {
 }
 // Returns geometry plus cumulative seconds at each vertex (used to sample pickup points along the way).
 async function osrmRoute(a, b) {
-  await osrmSlot();
-  const r = await fetch(`https://router.project-osrm.org/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=full&geometries=geojson&annotations=duration`);
-  const j = await r.json();
-  if (j.code !== "Ok") throw new Error(j.code);
+  let j;
+  for (let attempt = 0; ; attempt++) {   // public server sometimes answers 429 / times out: retry before giving up
+    try {
+      await osrmSlot();
+      const r = await fetch(`https://router.project-osrm.org/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=full&geometries=geojson&annotations=duration`);
+      if (r.status === 429) throw new Error("429");
+      j = await r.json();
+      if (j.code !== "Ok") throw new Error(j.code);
+      break;
+    } catch (e) { if (attempt === 3) throw e; await sleep(2000 * (attempt + 1)); }
+  }
   const rt = j.routes[0], cum = [0];
   for (const leg of rt.legs) for (const d of leg.annotation?.duration || []) cum.push(cum[cum.length - 1] + d);
   return { g: rt.geometry.coordinates, dur: rt.duration, cum: cum.length === rt.geometry.coordinates.length ? cum : null };
@@ -597,19 +604,21 @@ async function computePool(k) {
   if (k === mode) renderPool();
   try {
     const base = [];
-    for (let i = 0; i < P; i++) base[i] = await getRoute(src[i], R);
-    if (!alive()) return;
-    const drivers = src.map((_, i) => i).filter(i => !src[i].ride);
+    for (let i = 0; i < P; i++) { try { base[i] = await getRoute(src[i], R); } catch { base[i] = null; } if (!alive()) return; }
+    const has = i => !!base[i];
+    const drivers = src.map((_, i) => i).filter(i => !src[i].ride && has(i));
     const cand = [];
-    let T = null;   // person→person seconds
+    let T = null, okTables = 0;   // person→person seconds
     const nS = Math.min(POOL_SAMPLES, OSRM_MAX_COORDS - 2 * P);
     for (const d of drivers) {
       const smp = routeSamples(base[d], nS);
-      const { dur } = await osrmTable(src, [...src, ...smp], "duration");
+      let dur;
+      try { ({ dur } = await osrmTable(src, [...src, ...smp], "duration")); } catch { if (!alive()) return; continue; }
       if (!alive()) return;
       T = T || dur;
+      okTables++;
       for (let p = 0; p < P; p++) {
-        if (p === d) continue;
+        if (p === d || !has(p)) continue;
         const tp = base[p].dur, td = base[d].dur, opts = [];
         const dx = dur[d][p];
         if (dx != null) {
@@ -626,11 +635,12 @@ async function computePool(k) {
         if (src[p].ride) { const fb = opts.filter(o => o.kind === "door").sort((a, b) => a.extra - b.extra)[0]; if (fb) cand.push({ ...fb, d, p, over: !fb.ok, fallback: true }); }
       }
     }
+    if (drivers.length && !okTables) throw new Error("no tables");
     // greedy assignment
     const role = {}, doors = {}, routes = {}, plan = [];
     const chainExtra = (d, list) => {
       let t = 0, at = d;
-      for (const q of list) { t += T[at][q]; at = q; }
+      for (const q of list) { t += T[at][q] ?? 0; at = q; }
       return t + base[at].dur - base[d].dur;
     };
     const tryAdd = o => {
@@ -659,7 +669,7 @@ async function computePool(k) {
     plan.forEach(m => { if (m.kind === "door") m.order = doors[m.d].indexOf(m.p); });
     for (const m of plan) if (m.kind === "route" && m.idx > 0) { m.where = await areaName(m.x); if (!alive()) return; }
     ent.plan = plan; ent.state = "done";
-  } catch { if (pool[k] === ent) ent.state = "error"; }
+  } catch (e) { console.warn("carpool", e); if (pool[k] === ent) ent.state = "error"; }
   if (!alive()) return;
   if (k === mode) { renderPool(); refreshLines(); sharePromise = null; prepareShare(); }
   // Fetch the extra legs for the map (passenger → pickup, driver → door pickups).
@@ -684,7 +694,7 @@ async function areaName(x) {
 const mins = s => Math.max(1, Math.round(s / 60));
 // One source for the site and the WhatsApp message. b() bolds a name in either format.
 function poolLines(ent, b, t = x => x) {
-  const src = results.src, nm = i => b(src[i].name), out = [];
+  const src = results.src.map(p => ({ ...p, name: p.name.trim() })), nm = i => b(src[i].name), out = [];
   for (const m of ent.plan) {
     if (m.kind === "door") {
       const main = `${nm(m.p)} עולה לרכב של ${nm(m.d)} כבר מהבית.`;
