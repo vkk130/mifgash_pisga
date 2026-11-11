@@ -19,7 +19,11 @@
   header{padding:22px 18px 8px;max-width:1100px;margin:auto}
   h1{margin:0;font-size:30px;font-weight:800;letter-spacing:-.5px}
   h1 span{color:var(--a)}
-  .sub{color:var(--muted);margin:4px 0 0;font-size:15px}
+  .slogan{margin:2px 0 0;font-size:19px;font-weight:700}
+  .sub{color:var(--muted);margin:6px 0 0;font-size:15px;line-height:1.5;max-width:560px}
+  .steps{list-style:none;padding:0;margin:12px 0 0;display:flex;gap:6px;flex-wrap:wrap;counter-reset:s}
+  .steps li{counter-increment:s;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:5px 12px 5px 10px;font-size:14px}
+  .steps li::before{content:counter(s);display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--a);color:#fff;font-size:12px;font-weight:700;margin-left:6px}
   main{max-width:1100px;margin:auto;padding:10px 18px 40px;display:grid;gap:18px;grid-template-columns:400px minmax(0,1fr);grid-template-areas:"form map" "res map";align-items:start}
   main>section{min-width:0}
   #formSec{grid-area:form} #mapSec{grid-area:map;position:sticky;top:12px} #results{grid-area:res}
@@ -88,7 +92,9 @@
 <body>
 <header>
   <h1>מפגש <span>פסגה</span> ⛰️</h1>
-  <p class="sub">מכניסים איפה כל אחד נמצא, ומקבלים איפה הכי כדאי להיפגש.</p>
+  <p class="slogan">נקודת מפגש. בלי ויכוחים.</p>
+  <p class="sub">כותבים מאיפה כל אחד יוצא, ואנחנו מוצאים איפה הכי שווה לכם להיפגש. לפי נסיעה אמיתית בכביש, לא קו אווירי.</p>
+  <ol class="steps"><li><b>מי בא?</b> שם לכל אחד</li><li><b>מאיפה?</b> עיר או רחוב</li><li><b>לוחצים.</b> ושולחים לקבוצה</li></ol>
 </header>
 
 <main>
@@ -96,12 +102,12 @@
     <div class="card">
       <div class="people" id="people"></div>
       <div class="actions">
-        <button class="btn ghost" id="add">+ עוד משתתף</button>
-        <button class="btn go" id="calc" disabled>איפה נפגשים? 🔎</button>
+        <button class="btn ghost" id="add">+ עוד מישהו</button>
+        <button class="btn go" id="calc" disabled>מצאו לנו נקודה</button>
       </div>
       <div class="progress" id="progress"><i></i></div>
       <div class="status" id="status"></div>
-      <div class="hint">הקלידו כתובת או יישוב ובחרו מהרשימה, או לחצו 📍 ואחר כך על המפה. עד 25 משתתפים.</div>
+      <div class="hint">מקלידים ובוחרים מהרשימה. מעדיפים לסמן? לוחצים על 📍 ואז על המפה. עד 25 אנשים.</div>
     </div>
   </section>
 
@@ -111,8 +117,8 @@
 
   <section id="results">
       <div class="tabs">
-        <button class="tab a on" data-k="sum"><b>⚡ הכי יעיל</b><small>הכי מעט קילומטרים לכולם ביחד</small></button>
-        <button class="tab b" data-k="fair"><b>⚖️ הכי הוגן</b><small>אף אחד לא נוסע יותר מדי</small></button>
+        <button class="tab a on" data-k="sum"><b>⚡ הכי קצר ביחד</b><small>כמה שפחות ק״מ לכל החבר׳ה</small></button>
+        <button class="tab b" data-k="fair"><b>⚖️ הכי הוגן</b><small>אף אחד לא נדפק בנסיעה</small></button>
       </div>
       <div class="card" style="margin-top:10px">
         <div class="place" id="place"></div>
@@ -125,10 +131,10 @@
         </div>
         <details class="how"><summary>תצוגה מקדימה של ההודעה</summary><pre id="preview"></pre></details>
         <details class="how">
-          <summary>איך זה מחושב?</summary>
-          <p>אנחנו מפזרים עשרות נקודות מועמדות על המפה סביב כל המשתתפים, ובודקים לכל אחת מהן את מרחק הנסיעה ברכב בכבישים מכל משתתף (לא קו אווירי). אחר כך מתמקדים סביב הנקודות הטובות ביותר ומחפשים שוב בצפיפות גבוהה יותר, ארבעה סבבים בסך הכל.</p>
-          <p><b>הכי יעיל:</b> הנקודה שבה סכום הקילומטרים של כולם הוא הקטן ביותר. היא נמשכת לכיוון שבו גרים הכי הרבה אנשים.</p>
-          <p><b>הכי הוגן:</b> הנקודה שבה מי שנוסע הכי הרבה נוסע הכי מעט שאפשר. כך אף אחד לא נדפק במיוחד.</p>
+          <summary>איך זה עובד?</summary>
+          <p>אנחנו פורשים רשת של מאות נקודות על המפה, ובודקים לכל אחת כמה כל אחד מכם צריך לנסוע אליה ברכב. בכביש, לא באוויר. אחר כך עושים זום על הנקודות הכי טובות ובודקים שוב, עד שנשארת אחת.</p>
+          <p><b>הכי קצר ביחד:</b> הנקודה שבה סך הקילומטרים של כולם הכי נמוך. טובה לקבוצה, פחות למי שגר רחוק.</p>
+          <p><b>הכי הוגן:</b> מי שנוסע הכי הרבה נוסע כמה שפחות. ככה אף אחד לא סוחב את כל הנסיעה לבד.</p>
         </details>
       </div>
   </section>
@@ -201,8 +207,8 @@ function renderPeople() {
     row.innerHTML = `
       <div class="dot" style="background:${color(i)}">${esc(initial(p.name) === "?" ? i + 1 : initial(p.name))}</div>
       <div class="fields">
-        <input class="name" data-id="${p.id}" data-f="name" placeholder="שם (למשל: איתן)" value="${esc(p.name)}">
-        <input class="addr ${p.lat != null ? "ok" : ""}" data-id="${p.id}" data-f="addr" placeholder="כתובת או יישוב" value="${esc(p.addr)}" autocomplete="off">
+        <input class="name" data-id="${p.id}" data-f="name" placeholder="שם" value="${esc(p.name)}">
+        <input class="addr ${p.lat != null ? "ok" : ""}" data-id="${p.id}" data-f="addr" placeholder="מאיפה יוצאים? עיר או רחוב" value="${esc(p.addr)}" autocomplete="off">
       </div>
       <button class="iconbtn ${picking === p.id ? "on" : ""}" title="בחירה במפה" data-pick="${p.id}">📍</button>
       <button class="del" title="הסרה" data-del="${p.id}">×</button>`;
@@ -266,7 +272,7 @@ async function suggest(input, p) {
   if (q.length < 2) return closeSugg();
   let feats = [];
   try {
-    const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lat=31.8&lon=35.0&bbox=34.2,29.4,35.95,33.35`);
+    const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lang=default&lat=31.8&lon=35.0&bbox=34.2,29.4,35.95,33.35`);
     feats = (await r.json()).features || [];
   } catch { return; }
   if (input.value.trim() !== q) return;
@@ -393,7 +399,7 @@ async function runCalc() {
   renderPeople(); syncMarkers();
   const btn = $("#calc"); btn.disabled = true;
   $("#progress").style.display = "block"; $("#progress i").style.width = "4%";
-  $("#status").textContent = "מחשבים מרחקי נסיעה בכבישים… (כ-5 שניות)";
+  $("#status").textContent = "בודקים מאות נקודות על המפה… רגע אחד";
   try {
     const best = await optimise(src, f => { $("#progress i").style.width = (f * 100) + "%"; });
     results = { src: src.map(p => ({ ...p })), sum: best.sum, fair: best.fair };
@@ -463,46 +469,39 @@ async function reverseName(lat, lon, broad) {
 // ---------- funny lines ----------
 const pick = a => a[Math.floor(Math.random() * a.length)];
 const BANK = [
-  [2,   ["אפשר בעצם לבוא ברגל 🚶 רק {k} ק״מ.", "זה ממש ליד הבית, {k} ק״מ. אין תירוצים לאיחור!", "{k} ק״מ? בקושי מספיק להתניע את האוטו."]],
-  [8,   ["איזה כיף, כבר ממש באזור! רק {k} ק״מ.", "נסיעה של שיר וחצי: {k} ק״מ 🎶", "{k} ק״מ, כמעט שכנים של נקודת המפגש."]],
-  [20,  ["נסיעה קצרה ונעימה, {k} ק״מ. שלושה שירים וזהו.", "{k} ק״מ, בקושי מספיק לחמם את המזגן.", "רק {k} ק״מ, אין על מה להתלונן 😎"]],
-  [40,  ["{k} ק״מ, סביר לגמרי. כדאי להביא חטיף לדרך.", "{k} ק״מ, זמן מצוין לפרק של פודקאסט 🎧", "{k} ק״מ, נסיעה הוגנת לגמרי."]],
-  [70,  ["{k} ק״מ... כדאי לבדוק כמה דלק יש במיכל ⛽", "{k} ק״מ. זה כבר זמן לסדר את כל הפלייליסט מחדש.", "{k} ק״מ, אבל בשביל החברים זה שווה את זה 💪"]],
-  [120, ["אני מצטער, אבל אתה גר ממש רחוק... תצטרך לנסוע {k} ק״מ.", "{k} ק״מ 😬 קפה לדרך זה כבר חובה.", "{k} ק״מ. אולי כדאי להודיע לבוס שמחר מגיעים קצת מאוחר."]],
-  [1e9, ["{k} ק״מ?! זה כבר לא מפגש, זה טיול שנתי 🏕️", "{k} ק״מ. אולי עדיף לבנות שם בית...", "{k} ק״מ 🫠 תבוא, נחכה לך עם עוגה."]]
+  [2,   ["אפשר להגיע בכפכפים.", "זה בעצם מתחת לבית.", "אין שום תירוץ לאחר."]],
+  [8,   ["כמעט שכנים של הנקודה.", "נסיעה של שיר וחצי.", "ממש באזור, איזה כיף."]],
+  [20,  ["קצר ולעניין.", "בקושי מספיק לחמם את האוטו.", "רבע שעה, אולי פחות."]],
+  [40,  ["נסיעה סבירה לגמרי.", "בדיוק פרק של פודקאסט.", "סביר. לא נשמע תלונות."]],
+  [70,  ["כבר שווה לעצור לקפה בדרך.", "נסיעה רצינית, אבל בשביל החבר׳ה.", "שווה לבדוק דלק לפני."]],
+  [120, ["סורי, הפעם ממש רחוק.", "זה כבר מסע. מגיע כיבוד בהגעה.", "ארוך. מישהו חייב פה טרמפ חזרה."]],
+  [1e9, ["זה כבר לא מפגש, זה טיול שנתי.", "שווה לשקול לישון שם.", "כל הכבוד מראש על ההגעה."]]
 ];
-function funnyLine(d, rank, total) {
-  const k = km(d);
-  let line = pick(BANK.find(([lim]) => d / 1000 < lim)[1]).replace("{k}", k);
-  if (total > 2 && rank === 0) line += mode === "sum" ? " (הגיבור של הקבוצה 🏅)" : " (הכי רחוק, אבל זה המינימום האפשרי 🤝)";
-  if (total > 2 && rank === total - 1 && d > 2000) line += " (המזל בצד שלך 🍀)";
-  return line;
-}
+function funnyLine(d) { return pick(BANK.find(([lim]) => d / 1000 < lim)[1]); }
+const siteUrl = () => location.origin + location.pathname;
 
 function shareText() {
   const R = results[mode], src = results.src;
   const key = R.lat.toFixed(4) + "," + R.lon.toFixed(4);
   const order = src.map((p, i) => ({ p, d: R.d[i] })).sort((a, b) => b.d - a.d);
-  const title = mode === "sum" ? "⚡ האפשרות הכי יעילה (הכי מעט קילומטרים לכולם ביחד)" : "⚖️ האפשרות הכי הוגנת (אף אחד לא נוסע יותר מדי)";
-  const how = mode === "sum"
-    ? "איך חישבנו? בדקנו מאות נקודות על המפה, ולכל אחת מרחק נסיעה ברכב בכבישים מכל אחד מאיתנו. בחרנו את הנקודה שבה סך הקילומטרים של כולנו הוא הקטן ביותר."
-    : "איך חישבנו? בדקנו מאות נקודות על המפה, ולכל אחת מרחק נסיעה ברכב בכבישים מכל אחד מאיתנו. בחרנו את הנקודה שבה מי שנוסע הכי הרבה נוסע הכי מעט שאפשר.";
-  const lines = [
-    "⛰️ מפגש פסגה: איפה נפגשים?",
+  const why = mode === "sum"
+    ? `⚡ הלכנו על הנקודה הכי קצרה ביחד: ${km(R.sum)} ק״מ לכל החבר׳ה.`
+    : `⚖️ הלכנו על הנקודה הכי הוגנת: אף אחד לא נוסע יותר מ-${km(R.max)} ק״מ.`;
+  return [
+    "⛰️ מצאנו איפה נפגשים!",
     "",
-    title,
     "📍 " + (placeNames[key] ? "ליד " + placeNames[key] : "הנקודה במפה"),
     "🚗 ניווט: " + wazeUrl(R),
     "",
-    ...order.map((o, r) => `${o.p.name}: ${funnyLine(o.d, r, order.length)}`),
+    why,
     "",
-    `סך הכל ${km(R.sum)} ק״מ לכולנו ביחד, והכי רחוק ${km(R.max)} ק״מ.`,
+    "כמה כל אחד נוסע:",
+    ...order.map(o => `${o.p.name}: ${km(o.d)} ק״מ. ${funnyLine(o.d)}`),
     "",
-    how,
+    "איך זה עובד? מפגש פסגה בודק מאות נקודות על המפה, ומחשב לכל אחת את הנסיעה האמיתית בכביש מכל אחד מאיתנו.",
     "",
-    "לתוצאה המלאה: " + location.href
-  ];
-  return lines.join("\n");
+    "רוצים לבדוק בעצמכם? כנסו ל-" + siteUrl()
+  ].join("\n");
 }
 let cachedText = "", cachedFor = "";
 function updatePreview() {
