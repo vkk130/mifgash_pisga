@@ -1,7 +1,7 @@
 # Progress
 ## Done (2026-11-11)
-MVP live; mobile layout; copy + slogan; Hebrew place names/labels; coloured road routes; math in "איך זה עובד"; 84 funny lines in results table; short share message with Waze links; agent docs.
+MVP live; mobile layout; copy + slogan; Hebrew place names/labels; coloured road routes; math in "איך זה עובד"; 84 funny lines in results table; short share message with Waze links; agent docs; carpool suggestions ("נוסעים ביחד") with map stripes + share lines.
 ## Unverified (agent can't reach the map/routing servers)
-Mobile layout, Hebrew names, label filter, routes, is.gd links.
+Mobile layout, Hebrew names, label filter, routes, is.gd links, carpool on real roads (tested only with a mock router).
 ## Next
 Venue suggestions with Hillel's places API.

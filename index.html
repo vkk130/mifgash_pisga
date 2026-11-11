@@ -87,6 +87,16 @@
   .pm{width:26px;height:26px;border-radius:50%;color:#fff;font-weight:700;display:grid;place-items:center;font-size:12px;border:2px solid #fff;box-shadow:0 2px 6px #0003;font-family:Rubik}
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:99}
   .toast.show{opacity:1}
+  .ride{align-self:flex-start;font:inherit;font-size:13px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:3px 10px;cursor:pointer;color:var(--muted)}
+  .ride.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .ride:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  #pool{margin-top:10px;display:none}
+  #pool h3{margin:0 0 2px;font-size:17px}
+  .pool-item{padding:10px 0;border-bottom:1px solid #f0ece2;font-size:15px;line-height:1.5}
+  .pool-item:last-child{border-bottom:none;padding-bottom:0}
+  .pool-item small{display:block;color:var(--muted);font-size:13px}
+  .pool-item a{font-size:13px;color:var(--ink)}
+  .pk{width:24px;height:24px;border-radius:50%;background:#fff;border:3px solid;display:grid;place-items:center;font-size:12px;box-shadow:0 2px 6px #0003}
   footer{text-align:center;color:var(--muted);font-size:12px;padding:0 18px 24px}
   footer a{color:inherit}
 </style>
@@ -109,7 +119,7 @@
       </div>
       <div class="progress" id="progress"><i></i></div>
       <div class="status" id="status"></div>
-      <div class="hint">מקלידים ובוחרים מהרשימה. מעדיפים לסמן? לוחצים על 📍 ואז על המפה. עד 25 אנשים.</div>
+      <div class="hint">מקלידים ובוחרים מהרשימה. מעדיפים לסמן? לוחצים על 📍 ואז על המפה. עד 25 אנשים. מישהו בלי רכב? מסמנים לו 🙋 ונמצא מי יאסוף.</div>
     </div>
   </section>
 
@@ -142,7 +152,14 @@
           <p>הכי הוגן מחפש את הנקודה שממזערת את המקסימום (בעיית minimax). אם יש תיקו, מכריע הסכום:</p>
           <div class="math">x* = argmin<sub>x</sub> max<sub>i</sub> d<sub>i</sub>(x)</div>
           <p>אין לזה נוסחה סגורה, כי מרחק בכביש תלוי ברשת הכבישים. לכן מחפשים ברשת: בסבב הראשון פורשים רשת ריבועית של n×n נקודות על האזור של כל המשתתפים (פלוס 10%), כאשר n = ⌊√(100 − P)⌋ ו-P הוא מספר המשתתפים. בכל אחד משלושת הסבבים הבאים פורשים רשת חדשה וצפופה יותר סביב הנקודה הטובה ביותר לכל אחת משתי השיטות, ברוחב של צעד אחד מהרשת הקודמת. כל נקודה מוצמדת לכביש הקרוב, והמרחקים מגיעים מ-OSRM.</p>
+          <p><b>נוסעים ביחד:</b> אחרי שיש נקודה, בודקים לכל זוג נהג ונוסע שתי אפשרויות: הנהג אוסף מהבית, או שנפגשים בנקודה x על המסלול של הנהג. לכל אפשרות מחשבים כמה זמן נסיעה ברכב נפרד נחסך (t הוא זמן נסיעה, R הנקודה, Δ<sub>d</sub> הסיבוב של הנהג):</p>
+          <div class="math">s = t(p,R) − t(p,x) − Δ<sub>d</sub></div>
+          <p>מציעים רק אם הסיבוב של מי שעושה אותו (נהג או נוסע) הוא עד 15% מהנסיעה שלו ולא יותר מ-20 דק׳. הסיבוב על חשבון הזמן של מי שעושה אותו, והנקודה עצמה לא זזה. את הזוגות משבצים לפי החיסכון מהגדול לקטן (שיטת החיסכון של Clarke–Wright), וקודם כל את מי שצריך טרמפ.</p>
         </details>
+      </div>
+      <div class="card" id="pool">
+        <h3>🤝 נוסעים ביחד?</h3>
+        <div id="poolList"></div>
       </div>
   </section>
 </main>
@@ -183,13 +200,17 @@ let resultMarker = null;
 map.on("load", () => {
   hebrewLabels();
   map.addSource("lines", { type: "geojson", data: emptyFC() });
-  map.addLayer({ id: "lines-casing", type: "line", source: "lines", layout: { "line-join": "round", "line-cap": "round" },
+  const solo = ["!=", ["get", "shared"], 1];
+  map.addLayer({ id: "lines-casing", type: "line", source: "lines", filter: solo, layout: { "line-join": "round", "line-cap": "round" },
     paint: { "line-color": "#fff", "line-width": ["interpolate", ["linear"], ["zoom"], 7, 5, 13, 9], "line-opacity": ["case", ["==", ["get", "road"], 1], 0.95, 0] } });
-  map.addLayer({ id: "lines", type: "line", source: "lines", layout: { "line-join": "round", "line-cap": "round" },
+  map.addLayer({ id: "lines", type: "line", source: "lines", filter: solo, layout: { "line-join": "round", "line-cap": "round" },
     paint: { "line-color": ["get", "c"], "line-width": ["interpolate", ["linear"], ["zoom"], 7, 3, 13, 5.5],
              "line-opacity": ["case", ["==", ["get", "road"], 1], 1, 0] } });
-  map.addLayer({ id: "lines-pending", type: "line", source: "lines", filter: ["==", ["get", "road"], 0],
+  map.addLayer({ id: "lines-pending", type: "line", source: "lines", filter: ["all", solo, ["==", ["get", "road"], 0]],
     paint: { "line-color": ["get", "c"], "line-width": 2, "line-dasharray": [1, 2], "line-opacity": 0.6 } });
+  // Shared ride: passenger's colour dashed over the driver's line, so the two colours alternate.
+  map.addLayer({ id: "lines-shared", type: "line", source: "lines", filter: ["==", ["get", "shared"], 1],
+    paint: { "line-color": ["get", "c"], "line-width": ["interpolate", ["linear"], ["zoom"], 7, 3, 13, 5.5], "line-dasharray": [1.5, 1.5] } });
   if (results) drawResult();
 });
 map.on("click", e => {
@@ -221,7 +242,7 @@ const initial = n => (n || "?").trim().charAt(0) || "?";
 // ---------- people UI ----------
 function addPerson(data = {}) {
   if (people.length >= MAX_PEOPLE) return toast("הגעתם למקסימום של " + MAX_PEOPLE + " משתתפים");
-  people.push({ id: nextId++, name: data.name || "", addr: data.addr || "", lat: data.lat ?? null, lon: data.lon ?? null });
+  people.push({ id: nextId++, name: data.name || "", addr: data.addr || "", lat: data.lat ?? null, lon: data.lon ?? null, ride: !!data.ride });
   renderPeople();
 }
 function renderPeople() {
@@ -236,6 +257,7 @@ function renderPeople() {
       <div class="fields">
         <input class="name" data-id="${p.id}" data-f="name" placeholder="שם" value="${esc(p.name)}">
         <input class="addr ${p.lat != null ? "ok" : ""}" data-id="${p.id}" data-f="addr" placeholder="מאיפה יוצאים? עיר או רחוב" value="${esc(p.addr)}" autocomplete="off">
+        <button class="ride ${p.ride ? "on" : ""}" data-ride="${p.id}" aria-pressed="${p.ride}">🙋 ${p.ride ? "צריך טרמפ" : "צריך טרמפ?"}</button>
       </div>
       <button class="iconbtn ${picking === p.id ? "on" : ""}" title="בחירה במפה" data-pick="${p.id}">📍</button>
       <button class="del" title="הסרה" data-del="${p.id}">×</button>`;
@@ -254,7 +276,12 @@ function updateCalc() {
 }
 $("#add").onclick = () => addPerson();
 $("#people").addEventListener("click", e => {
-  const del = e.target.dataset.del, pick = e.target.dataset.pick;
+  const del = e.target.dataset.del, pick = e.target.dataset.pick, ride = e.target.dataset.ride;
+  if (ride) {
+    const p = people.find(x => x.id == ride); p.ride = !p.ride; renderPeople();
+    const s = results?.src.find(x => x.id === p.id);
+    if (s) { s.ride = p.ride; pool = { sum: null, fair: null }; sharePromise = null; writeHash(); computePool(mode); }
+  }
   if (del) { people = people.filter(p => p.id != del); renderPeople(); syncMarkers(); }
   if (pick) setPicking(picking == pick ? null : +pick);
 });
@@ -353,22 +380,26 @@ function fitAll(extra) {
 
 // ---------- the optimisation ----------
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-let lastCall = 0;
-async function osrmTable(srcs, dests) {
-  const wait = 1100 - (Date.now() - lastCall);   // be polite to the public server (~1 req/s)
-  if (wait > 0) await sleep(wait);
-  lastCall = Date.now();
+// Every OSRM call goes through one queue: ≤1 req/s to the public server, even when several loops run at once.
+let lastCall = 0, osrmQueue = Promise.resolve();
+function osrmSlot() {
+  const slot = osrmQueue.then(async () => { const w = 1100 - (Date.now() - lastCall); if (w > 0) await sleep(w); lastCall = Date.now(); });
+  osrmQueue = slot.catch(() => {});
+  return slot;
+}
+async function osrmTable(srcs, dests, ann = "distance") {
   const coords = [...srcs, ...dests].map(p => `${p.lon.toFixed(6)},${p.lat.toFixed(6)}`).join(";");
   const s = srcs.map((_, i) => i).join(";");
   const d = dests.map((_, i) => i + srcs.length).join(";");
-  const url = `${OSRM}${coords}?sources=${s}&destinations=${d}&annotations=distance`;
+  const url = `${OSRM}${coords}?sources=${s}&destinations=${d}&annotations=${ann}`;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
+      await osrmSlot();
       const r = await fetch(url);
       if (r.status === 429) { await sleep(2000 * (attempt + 1)); continue; }
       const j = await r.json();
       if (j.code !== "Ok") throw new Error(j.message || j.code);
-      return { dist: j.distances, snapped: j.destinations.map(w => ({ lon: w.location[0], lat: w.location[1] })) };
+      return { dist: j.distances, dur: j.durations, snapped: j.destinations.map(w => ({ lon: w.location[0], lat: w.location[1] })) };
     } catch (e) { if (attempt === 2) throw e; await sleep(1500); }
   }
   throw new Error("השרת עמוס");
@@ -430,6 +461,7 @@ async function runCalc() {
   try {
     const best = await optimise(src, f => { $("#progress i").style.width = (f * 100) + "%"; });
     results = { src: src.map(p => ({ ...p })), sum: best.sum, fair: best.fair };
+    pool = { sum: null, fair: null };
     sharePromise = null;
     $("#status").textContent = "";
     writeHash();
@@ -444,7 +476,7 @@ async function runCalc() {
 }
 
 // ---------- results ----------
-document.querySelectorAll(".tab").forEach(t => t.onclick = () => { mode = t.dataset.k; showResults(); });
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => { mode = t.dataset.k; sharePromise = null; showResults(); });
 const km = m => { const k = m / 1000; return k < 10 ? k.toFixed(1).replace(/\.0$/, "") : Math.round(k).toString(); };
 
 async function showResults() {
@@ -462,15 +494,50 @@ async function showResults() {
   $("#table").innerHTML = order.map(o => `<tr><td>${esc(o.p.name)}<div class="quip">${esc(funnyLine(o.d))}</div><div class="bar" style="width:${Math.max(4, 100 * o.d / maxD)}%;background:${color(people.findIndex(x => x.id === o.p.id) < 0 ? o.i : people.findIndex(x => x.id === o.p.id))}"></div></td><td class="km">${km(o.d)} ק״מ</td></tr>`).join("");
   $("#totals").innerHTML = `<span>סך הכל: <b>${km(R.sum)} ק״מ</b></span><span>הכי רחוק: <b>${km(R.max)} ק״מ</b></span><span>פער: <b>${km(R.max - Math.min(...R.d))} ק״מ</b></span>`;
   drawResult();
+  if (!pool[mode]) computePool(mode); else renderPool();
   if (!sharePromise) { writeHash(); prepareShare(); }
 }
-const routeCache = {};
 let drawToken = 0;
 function personColor(p, i) { const k = people.findIndex(x => x.id === p.id); return color(k < 0 ? i : k); }
-function setLines(R, geoms) {
-  map.getSource("lines").setData({ type: "FeatureCollection", features: results.src.map((p, i) => ({
-    type: "Feature", properties: { c: personColor(p, i), road: geoms[i] ? 1 : 0 },
-    geometry: { type: "LineString", coordinates: geoms[i] || [[p.lon, p.lat], [R.lon, R.lat]] } })) });
+// Routes: one shared promise per (a→b) so the map and the carpool search never fetch twice.
+const routeCache = {}, resolved = {};
+const ptKey = p => `${p.lat.toFixed(5)},${p.lon.toFixed(5)}`;
+function getRoute(a, b) {
+  const k = ptKey(a) + ">" + ptKey(b);
+  if (!routeCache[k]) routeCache[k] = osrmRoute(a, b).then(r => (resolved[k] = r)).catch(e => { delete routeCache[k]; throw e; });
+  return routeCache[k];
+}
+const routeNow = (a, b) => resolved[ptKey(a) + ">" + ptKey(b)];
+let pickupMarkers = [];
+function refreshLines() {
+  if (!results || !map.getSource("lines")) return;
+  const R = results[mode], src = results.src, ent = pool[mode];
+  const plan = ent?.state === "done" ? ent.plan : [];
+  const feats = [];
+  const line = (c, a, b, r, shared) => feats.push({ type: "Feature", properties: { c, road: r ? 1 : 0, shared: shared ? 1 : 0 },
+    geometry: { type: "LineString", coordinates: r ? r : [[a.lon, a.lat], [b.lon, b.lat]] } });
+  const asPas = {}; plan.forEach(m => { asPas[m.p] = m; });
+  src.forEach((p, i) => {
+    const c = personColor(p, i), m = asPas[i];
+    if (m) { if (m.kind === "route") line(c, p, m.x, routeNow(p, m.x)?.g); return; }   // passenger: only the leg to the pickup
+    const mine = plan.filter(q => q.d === i);
+    const doors = mine.filter(q => q.kind === "door").sort((a, b) => a.order - b.order);
+    const stops = [p, ...doors.map(q => src[q.p]), R];
+    for (let s = 0; s < stops.length - 1; s++) {
+      const g = routeNow(stops[s], stops[s + 1])?.g;
+      line(c, stops[s], stops[s + 1], g);
+      if (s > 0 && g) line(personColor(src[doors[s - 1].p], doors[s - 1].p), null, null, g, true);
+    }
+    const base = routeNow(p, R);
+    if (!doors.length && base) mine.forEach(q => line(personColor(src[q.p], q.p), null, null, base.g.slice(q.idx), true));
+  });
+  map.getSource("lines").setData({ type: "FeatureCollection", features: feats });
+  pickupMarkers.forEach(mk => mk.remove());
+  pickupMarkers = plan.filter(m => m.kind === "route").map(m => {
+    const el = document.createElement("div"); el.className = "pk"; el.textContent = "🤝";
+    el.style.borderColor = personColor(src[m.d], m.d); el.title = "נקודת איסוף";
+    return new maplibregl.Marker({ element: el }).setLngLat([m.x.lon, m.x.lat]).addTo(map);
+  });
 }
 async function drawResult() {
   if (!results || !map.getSource("lines")) return;
@@ -484,29 +551,167 @@ async function drawResult() {
   }
   resultMarker.setLngLat([R.lon, R.lat]);
   resultMarker.getElement().querySelector("path").setAttribute("fill", c);
-  const keyOf = p => `${p.lat.toFixed(5)},${p.lon.toFixed(5)}>${R.lat.toFixed(5)},${R.lon.toFixed(5)}`;
-  const geoms = results.src.map(p => routeCache[keyOf(p)] || null);
-  setLines(R, geoms);
+  refreshLines();
   fitAll([R.lon, R.lat]);
-  for (let i = 0; i < results.src.length; i++) {
-    if (geoms[i]) continue;
-    const p = results.src[i];
-    try {
-      const g = await osrmRoute(p, R);
-      if (token !== drawToken) return;
-      routeCache[keyOf(p)] = geoms[i] = g;
-      setLines(R, geoms);
-    } catch { if (token !== drawToken) return; }
+  for (const p of results.src) {
+    try { await getRoute(p, R); } catch {}
+    if (token !== drawToken) return;
+    refreshLines();
   }
 }
+// Returns geometry plus cumulative seconds at each vertex (used to sample pickup points along the way).
 async function osrmRoute(a, b) {
-  const wait = 1100 - (Date.now() - lastCall);
-  if (wait > 0) await sleep(wait);
-  lastCall = Date.now();
-  const r = await fetch(`https://router.project-osrm.org/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=full&geometries=geojson`);
+  await osrmSlot();
+  const r = await fetch(`https://router.project-osrm.org/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=full&geometries=geojson&annotations=duration`);
   const j = await r.json();
   if (j.code !== "Ok") throw new Error(j.code);
-  return j.routes[0].geometry.coordinates;
+  const rt = j.routes[0], cum = [0];
+  for (const leg of rt.legs) for (const d of leg.annotation?.duration || []) cum.push(cum[cum.length - 1] + d);
+  return { g: rt.geometry.coordinates, dur: rt.duration, cum: cum.length === rt.geometry.coordinates.length ? cum : null };
+}
+
+// ---------- carpool ----------
+// Meeting point is fixed first; then we look for pairs who can share a car on the way to it.
+// Per driver d and person p, two options: d picks p up at home ("door"), or p drives to a point x
+// on d's route and continues with d ("route"). Saving s = t(p,R) − t(p,x) − Δd (car-seconds saved).
+// Only offered when whoever makes the detour adds ≤ min(15% of own trip, 20 min) — on their own time.
+// Assignment: greedy by saving (Clarke–Wright style), people who need a ride first. No seat limit.
+const POOL_SAMPLES = 30;
+const detourLimit = t => Math.min(0.15 * t, 1200);
+let pool = { sum: null, fair: null };
+function routeSamples(r, n) {
+  const g = r.g, last = g.length - 1, out = [];
+  for (let k = 0; k < n; k++) {
+    let idx;
+    if (r.cum) { const target = r.dur * k / n; idx = r.cum.findIndex(c => c >= target); }
+    else idx = Math.floor(k * last / n);
+    if (out.length && out[out.length - 1].idx === idx) continue;
+    out.push({ lon: g[idx][0], lat: g[idx][1], idx, rem: r.cum ? r.dur - r.cum[idx] : r.dur * (1 - idx / last) });
+  }
+  return out;
+}
+async function computePool(k) {
+  const R = results[k], src = results.src, P = src.length;
+  const ent = pool[k] = { state: "loading", plan: [], none: [] };
+  const alive = () => pool[k] === ent && results?.[k] === R;
+  if (k === mode) renderPool();
+  try {
+    const base = [];
+    for (let i = 0; i < P; i++) base[i] = await getRoute(src[i], R);
+    if (!alive()) return;
+    const drivers = src.map((_, i) => i).filter(i => !src[i].ride);
+    const cand = [];
+    let T = null;   // person→person seconds
+    const nS = Math.min(POOL_SAMPLES, OSRM_MAX_COORDS - 2 * P);
+    for (const d of drivers) {
+      const smp = routeSamples(base[d], nS);
+      const { dur } = await osrmTable(src, [...src, ...smp], "duration");
+      if (!alive()) return;
+      T = T || dur;
+      for (let p = 0; p < P; p++) {
+        if (p === d) continue;
+        const tp = base[p].dur, td = base[d].dur, opts = [];
+        const dx = dur[d][p];
+        if (dx != null) {
+          const extra = Math.max(0, dx + tp - td);
+          opts.push({ kind: "door", extra, who: "d", ok: extra <= detourLimit(td), s: tp - extra });
+        }
+        smp.forEach((x, j) => {
+          const tpx = dur[p][P + j]; if (tpx == null) return;
+          const extra = Math.max(0, tpx + x.rem - tp);
+          opts.push({ kind: "route", x, idx: x.idx, leg: tpx, extra, who: "p", ok: extra <= detourLimit(tp), s: tp - tpx });
+        });
+        const minGain = src[p].ride ? 0 : Math.max(300, 0.3 * tp);   // don't suggest "drive alone 40 min to share the last 5"
+        opts.filter(o => o.ok && o.s >= minGain).forEach(o => cand.push({ ...o, d, p }));
+        if (src[p].ride) { const fb = opts.filter(o => o.kind === "door").sort((a, b) => a.extra - b.extra)[0]; if (fb) cand.push({ ...fb, d, p, over: !fb.ok, fallback: true }); }
+      }
+    }
+    // greedy assignment
+    const role = {}, doors = {}, routes = {}, plan = [];
+    const chainExtra = (d, list) => {
+      let t = 0, at = d;
+      for (const q of list) { t += T[at][q]; at = q; }
+      return t + base[at].dur - base[d].dur;
+    };
+    const tryAdd = o => {
+      if (role[o.p] || role[o.d] === "pas") return false;
+      if (o.kind === "door") {
+        if (routes[o.d]) return false;
+        const cur = doors[o.d] || [];
+        const next = [...cur, o.p].sort((a, b) => T[o.d][a] - T[o.d][b]);
+        const before = cur.length ? chainExtra(o.d, cur) : 0, after = chainExtra(o.d, next);
+        if (!o.fallback && after > detourLimit(base[o.d].dur)) return false;
+        o.extra = Math.max(0, after - before);
+        doors[o.d] = next;
+      } else {
+        if (doors[o.d]) return false;
+        routes[o.d] = true;
+      }
+      role[o.p] = "pas"; role[o.d] = "drv"; plan.push(o); return true;
+    };
+    const bySaving = (a, b) => b.s - a.s;
+    for (let p = 0; p < P; p++) {
+      if (!src[p].ride) continue;
+      const mine = cand.filter(c => c.p === p);
+      if (!mine.filter(c => !c.fallback).sort(bySaving).some(tryAdd) && !mine.filter(c => c.fallback).sort((a, b) => a.extra - b.extra).some(tryAdd)) ent.none.push(p);
+    }
+    cand.filter(c => !src[c.p].ride && !c.fallback).sort(bySaving).forEach(tryAdd);
+    plan.forEach(m => { if (m.kind === "door") m.order = doors[m.d].indexOf(m.p); });
+    for (const m of plan) if (m.kind === "route" && m.idx > 0) { m.where = await areaName(m.x); if (!alive()) return; }
+    ent.plan = plan; ent.state = "done";
+  } catch { if (pool[k] === ent) ent.state = "error"; }
+  if (!alive()) return;
+  if (k === mode) { renderPool(); refreshLines(); sharePromise = null; prepareShare(); }
+  // Fetch the extra legs for the map (passenger → pickup, driver → door pickups).
+  for (const m of ent.plan) {
+    const src2 = results.src;
+    const legs = m.kind === "route" ? [[src2[m.p], m.x]]
+      : (() => { const st = [src2[m.d], ...doors_(m.d).map(i => src2[i]), R]; return st.slice(0, -1).map((a, i) => [a, st[i + 1]]); })();
+    for (const [a, b] of legs) { try { await getRoute(a, b); } catch {} if (!alive()) return; if (k === mode) refreshLines(); }
+  }
+  function doors_(d) { return ent.plan.filter(q => q.d === d && q.kind === "door").sort((a, b) => a.order - b.order).map(q => q.p); }
+}
+async function areaName(x) {
+  try {
+    await sleep(1100);   // Nominatim: ≤1 req/s
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${x.lat}&lon=${x.lon}&zoom=16&accept-language=he`);
+    const a = (await r.json()).address || {};
+    const town = a.city || a.town || a.village || a.hamlet || a.suburb, road = a.road;
+    if (town) return "באזור " + town + (road ? ` (${road})` : "");
+    return road ? "ליד " + road : "בנקודה שבמפה";
+  } catch { return "בנקודה שבמפה"; }
+}
+const mins = s => Math.max(1, Math.round(s / 60));
+// One source for the site and the WhatsApp message. b() bolds a name in either format.
+function poolLines(ent, b, t = x => x) {
+  const src = results.src, nm = i => b(src[i].name), out = [];
+  for (const m of ent.plan) {
+    if (m.kind === "door") {
+      const main = `${nm(m.p)} עולה לרכב של ${nm(m.d)} כבר מהבית.`;
+      let sub = m.extra < 60 ? "כמעט בלי סיבוב." : `סיבוב של ${mins(m.extra)} דק׳ ל${src[m.d].name}.`;
+      if (m.over) sub += " יותר ממה שנחשב סביר, אבל ככה כולם מגיעים 🙃";
+      out.push({ main, sub });
+    } else {
+      const main = `${nm(m.p)} ו${nm(m.d)} נפגשים ${m.idx > 0 ? t(m.where) : "אצל " + nm(m.d)}, ומשם ממשיכים ברכב אחד.`;
+      let sub = `${mins(m.leg)} דק׳ נסיעה עד שם ל${src[m.p].name}.`;
+      if (m.extra >= 60) sub += ` זה מוסיף ל${src[m.p].name} ${mins(m.extra)} דק׳ לדרך.`;
+      out.push({ main, sub, x: m.x });
+    }
+  }
+  for (const p of ent.none) out.push({ main: `לא מצאנו מי ייקח את ${nm(p)}.`, sub: "אולי מישהו מתנדב?" });
+  return out;
+}
+function renderPool() {
+  const box = $("#pool"), list = $("#poolList"), ent = pool[mode];
+  if (!ent) { box.style.display = "none"; return; }
+  if (ent.state !== "done") {
+    box.style.display = "block";
+    list.innerHTML = `<div class="pool-item"><small>${ent.state === "loading" ? "בודקים מי יכול לנסוע עם מי…" : "לא הצלחנו לבדוק טרמפים כרגע. נסו שוב עוד מעט."}</small></div>`;
+    return;
+  }
+  const lines = poolLines(ent, s => `<b>${esc(s)}</b>`, esc);
+  box.style.display = lines.length ? "block" : "none";
+  list.innerHTML = lines.map(l => `<div class="pool-item">${l.main}<small>${esc(l.sub)}</small>${l.x ? `<a target="_blank" href="${wazeUrl(l.x)}">🚗 Waze לנקודת האיסוף</a>` : ""}</div>`).join("");
 }
 const wazeUrl = R => `https://waze.com/ul?ll=${R.lat.toFixed(5)},${R.lon.toFixed(5)}`;
 const gmapsUrl = R => `https://www.google.com/maps/search/?api=1&query=${R.lat.toFixed(6)},${R.lon.toFixed(6)}`;
@@ -591,10 +796,14 @@ async function shareText() {
     ? [`📍 *ליד ${nS}*`, `🚗 ${wazeUrl(S)}`, `הפעם שתי השיטות הסכימו: זו גם הנקודה הכי קצרה לכולנו ביחד (${km(S.sum)} ק״מ סה״כ) וגם הכי הוגנת (אף אחד לא נוסע יותר מ-${km(F.max)} ק״מ).`]
     : [`⚡ *הכי קצר ביחד: ליד ${nS}*`, `🚗 ${wazeUrl(S)}`, `הנקודה שבה סך הקילומטרים של כולנו הכי נמוך: ${km(S.sum)} ק״מ.`, "",
        `⚖️ *הכי הוגן: ליד ${nF}*`, `🚗 ${wazeUrl(F)}`, `הנקודה שבה מי שנוסע הכי הרבה נוסע כמה שפחות: מקסימום ${km(F.max)} ק״מ.`];
+  const ent = pool[mode], rides = ent?.state === "done" ? poolLines(ent, n => `*${n}*`) : [];
+  const poolPart = rides.length ? ["", same ? "🤝 *נוסעים ביחד:*" : `🤝 *נוסעים ביחד* (בדרך ל${mode === "sum" ? "הכי קצר" : "הכי הוגן"}):`,
+    ...rides.map(l => `• ${l.main}` + (l.x ? `\n   📍 ${wazeUrl(l.x)}` : ""))] : [];
   return [
     "⛰️ מצאנו איפה נפגשים!",
     "",
     ...pts,
+    ...poolPart,
     "",
     "📊 כמה כל אחד נוסע, ומפה עם המסלולים:",
     link,
@@ -622,13 +831,16 @@ $("#shareCopy").onclick = async () => {
 // ---------- link state ----------
 function writeHash() {
   const data = { p: results.src.map(p => [p.name, +p.lat.toFixed(4), +p.lon.toFixed(4)]) };
+  const r = results.src.map((p, i) => p.ride ? i : -1).filter(i => i >= 0);
+  if (r.length) data.r = r;
   history.replaceState(null, "", "#" + b64e(JSON.stringify(data)));
 }
 function readHash() {
   if (location.hash.length < 3) return false;
   try {
     const data = JSON.parse(b64d(location.hash.slice(1)));
-    data.p.slice(0, MAX_PEOPLE).forEach(([name, lat, lon, addr]) => addPerson({ name, lat, lon, addr: addr || "נקודה במפה" }));
+    const rides = new Set(data.r || []);
+    data.p.slice(0, MAX_PEOPLE).forEach(([name, lat, lon, addr], i) => addPerson({ name, lat, lon, addr: addr || "נקודה במפה", ride: rides.has(i) }));
     if (data.m === "fair") mode = "fair";
     return true;
   } catch { return false; }
