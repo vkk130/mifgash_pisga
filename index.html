@@ -82,7 +82,7 @@
   .copy{margin-top:6px}
   .how{margin-top:14px;font-size:14px;color:var(--muted);line-height:1.6}
   .how summary{cursor:pointer;color:var(--ink);font-weight:500}
-  .pin{width:38px;height:50px;filter:drop-shadow(0 3px 4px #0005);cursor:default}
+  .pin{width:38px;height:50px;filter:drop-shadow(0 3px 4px #0005)}
   .pin svg{display:block}
   .pm{width:26px;height:26px;border-radius:50%;color:#fff;font-weight:700;display:grid;place-items:center;font-size:12px;border:2px solid #fff;box-shadow:0 2px 6px #0003;font-family:Rubik}
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:99}
@@ -121,6 +121,11 @@
   body.focus #formSec, body.focus #mapSec, body.focus #results > .card:not(#pool){display:none}
   body.focus main{grid-template-columns:minmax(0,640px);grid-template-areas:"res";justify-content:center}
   body.focus #results{display:block}
+  .pm,.pk,.pin{cursor:pointer;transition:opacity .2s}
+  .faded{opacity:.25}
+  .pop{font-family:Rubik;font-size:13px;line-height:1.5;direction:rtl;text-align:right}
+  .pop b{font-size:14px}
+  .pop a{display:inline-block;margin-top:4px}
   .pk{width:24px;height:24px;border-radius:50%;background:#fff;border:3px solid;display:grid;place-items:center;font-size:12px;box-shadow:0 2px 6px #0003}
   footer{text-align:center;color:var(--muted);font-size:12px;padding:0 18px 24px}
   footer a{color:inherit}
@@ -231,19 +236,20 @@ map.on("load", () => {
   map.addSource("lines", { type: "geojson", data: emptyFC() });
   const solo = ["!=", ["get", "shared"], 1];
   map.addLayer({ id: "lines-casing", type: "line", source: "lines", filter: solo, layout: { "line-join": "round", "line-cap": "round" },
-    paint: { "line-color": "#fff", "line-width": ["interpolate", ["linear"], ["zoom"], 7, 5, 13, 9], "line-opacity": ["case", ["==", ["get", "road"], 1], 0.95, 0] } });
+    paint: { "line-color": "#fff", "line-width": ["interpolate", ["linear"], ["zoom"], 7, 5, 13, 9], "line-opacity": ["case", ["==", ["get", "road"], 1], ["case", ["==", ["get", "dim"], 1], 0, 0.95], 0] } });
   map.addLayer({ id: "lines", type: "line", source: "lines", filter: solo, layout: { "line-join": "round", "line-cap": "round" },
     paint: { "line-color": ["get", "c"], "line-width": ["interpolate", ["linear"], ["zoom"], 7, 3, 13, 5.5],
-             "line-opacity": ["case", ["==", ["get", "road"], 1], 1, 0] } });
+             "line-opacity": ["case", ["==", ["get", "road"], 1], ["case", ["==", ["get", "dim"], 1], 0.15, 1], 0] } });
   map.addLayer({ id: "lines-pending", type: "line", source: "lines", filter: ["all", solo, ["==", ["get", "road"], 0]],
-    paint: { "line-color": ["get", "c"], "line-width": 2, "line-dasharray": [1, 2], "line-opacity": 0.6 } });
+    paint: { "line-color": ["get", "c"], "line-width": 2, "line-dasharray": [1, 2], "line-opacity": ["case", ["==", ["get", "dim"], 1], 0.1, 0.6] } });
   // Shared ride: passenger's colour dashed over the driver's line, so the two colours alternate.
   map.addLayer({ id: "lines-shared", type: "line", source: "lines", filter: ["==", ["get", "shared"], 1],
-    paint: { "line-color": ["get", "c"], "line-width": ["interpolate", ["linear"], ["zoom"], 7, 3, 13, 5.5], "line-dasharray": [1.5, 1.5] } });
+    paint: { "line-color": ["get", "c"], "line-width": ["interpolate", ["linear"], ["zoom"], 7, 3, 13, 5.5], "line-dasharray": [1.5, 1.5], "line-opacity": ["case", ["==", ["get", "dim"], 1], 0.15, 1] } });
   if (results) drawResult();
 });
 map.on("click", e => {
-  if (!picking) return;
+  if (e.originalEvent?.target?.closest?.(".pm,.pk,.pin")) return;
+  if (!picking) { if (focusSet) clearFocus(); return; }
   const p = people.find(x => x.id === picking);
   setPicking(null);
   if (!p) return;
@@ -391,6 +397,7 @@ function syncMarkers() {
     if (!m) {
       const el = document.createElement("div"); el.className = "pm";
       m = markers[p.id] = new maplibregl.Marker({ element: el }).setLngLat([p.lon, p.lat]).addTo(map);
+      const id = p.id; el.addEventListener("click", ev => { ev.stopPropagation(); focusPerson(id); });
     }
     m.setLngLat([p.lon, p.lat]);
     const el = m.getElement(); el.style.background = color(i); el.textContent = initial(p.name) === "?" ? i + 1 : initial(p.name);
@@ -525,6 +532,7 @@ const km = m => { const k = m / 1000; return k < 10 ? k.toFixed(1).replace(/\.0$
 
 async function showResults() {
   if (!results) return;
+  focusSet = null; focusPopup?.remove(); focusPopup = null;
   document.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.dataset.k === mode));
   $("#results").style.display = "block";
   const R = results[mode], src = results.src;
@@ -553,35 +561,74 @@ function getRoute(a, b) {
 }
 const routeNow = (a, b) => resolved[ptKey(a) + ">" + ptKey(b)];
 let pickupMarkers = [];
+// ---------- focus (tap a person / pickup on the map) ----------
+let focusSet = null, focusPopup = null;   // focusSet: indexes in results.src that stay bright
+function setFocus(set, pts, html, at) {
+  focusSet = set;
+  focusPopup?.remove(); focusPopup = null;
+  if (html) focusPopup = new maplibregl.Popup({ offset: 16, closeButton: false, maxWidth: "240px" }).setLngLat(at).setHTML(`<div class="pop">${html}</div>`).addTo(map);
+  fadeMarkers(); refreshLines();
+  if (pts.length === 1) map.flyTo({ center: pts[0], zoom: Math.max(map.getZoom(), 12) });
+  else { const b = new maplibregl.LngLatBounds(pts[0], pts[0]); pts.forEach(x => b.extend(x)); map.fitBounds(b, { padding: 70, maxZoom: 14, duration: 600 }); }
+}
+function clearFocus() { focusSet = null; focusPopup?.remove(); focusPopup = null; fadeMarkers(); refreshLines(); }
+function fadeMarkers() {
+  const src = results?.src || [];
+  people.forEach(p => { const k = src.findIndex(x => x.id === p.id); markers[p.id]?.getElement().classList.toggle("faded", !!focusSet && !focusSet.has(k)); });
+  pickupMarkers.forEach(mk => mk.getElement().classList.toggle("faded", !!focusSet && !focusSet.has(mk._m.p)));
+}
+// Everything one person does: their route (+ pickups / who they drive) and the meeting point.
+function focusPerson(id) {
+  const p = people.find(x => x.id === id); if (!p || p.lat == null) return;
+  const name = `<b>${esc(p.name?.trim() || "בלי שם")}</b>`;
+  if (!results) return setFocus(null, [[p.lon, p.lat]], name, [p.lon, p.lat]);
+  const src = results.src, i = src.findIndex(x => x.id === id), R = results[mode];
+  if (i < 0) return setFocus(null, [[p.lon, p.lat]], name, [p.lon, p.lat]);
+  const set = new Set([i]), pts = [[p.lon, p.lat], [R.lon, R.lat]];
+  const plan = pool[mode]?.state === "done" ? pool[mode].plan : [];
+  plan.forEach(m => { if (m.p === i || m.d === i) { set.add(m.p); set.add(m.d); if (m.x) pts.push([m.x.lon, m.x.lat]); } });
+  const r = routeNow(src[i], R);
+  let html = `${name}<br>${km(R.d[i])} ק״מ${r?.dur ? ` · ${mins(r.dur)} דק׳` : ""} עד נקודת המפגש`;
+  set.forEach(k => { if (k !== i) pts.push([src[k].lon, src[k].lat]); });
+  setFocus(set, pts, html, [p.lon, p.lat]);
+}
+// A pickup: the two people, the pickup point and where they continue to.
+function focusPickup(m) {
+  const src = results.src, R = results[mode], nm = k => `<b>${esc(src[k].name.trim())}</b>`;
+  const html = `🤝 ${nm(m.p)} ו${nm(m.d)} נפגשים כאן<br>${mins(m.leg)} דק׳ נסיעה עד לכאן ל${esc(src[m.p].name.trim())}<br><a target="_blank" href="${wazeUrl(m.x)}">🚗 Waze לנקודת האיסוף</a>`;
+  setFocus(new Set([m.p, m.d]), [[src[m.p].lon, src[m.p].lat], [src[m.d].lon, src[m.d].lat], [m.x.lon, m.x.lat], [R.lon, R.lat]], html, [m.x.lon, m.x.lat]);
+}
 function refreshLines() {
   if (!results || !map.getSource("lines")) return;
   const R = results[mode], src = results.src, ent = pool[mode];
   const plan = ent?.state === "done" ? ent.plan : [];
   const feats = [];
-  const line = (c, a, b, r, shared) => feats.push({ type: "Feature", properties: { c, road: r ? 1 : 0, shared: shared ? 1 : 0 },
+  const line = (c, a, b, r, shared, who) => feats.push({ type: "Feature", properties: { c, road: r ? 1 : 0, shared: shared ? 1 : 0, dim: focusSet && !focusSet.has(who) ? 1 : 0 },
     geometry: { type: "LineString", coordinates: r ? r : [[a.lon, a.lat], [b.lon, b.lat]] } });
   const asPas = {}; plan.forEach(m => { asPas[m.p] = m; });
   src.forEach((p, i) => {
     const c = personColor(p, i), m = asPas[i];
-    if (m) { if (m.kind === "route") line(c, p, m.x, routeNow(p, m.x)?.g); return; }   // passenger: only the leg to the pickup
+    if (m) { if (m.kind === "route") line(c, p, m.x, routeNow(p, m.x)?.g, false, i); return; }   // passenger: only the leg to the pickup
     const mine = plan.filter(q => q.d === i);
     const doors = mine.filter(q => q.kind === "door").sort((a, b) => a.order - b.order);
     const stops = [p, ...doors.map(q => src[q.p]), R];
     for (let s = 0; s < stops.length - 1; s++) {
       const g = routeNow(stops[s], stops[s + 1])?.g;
-      line(c, stops[s], stops[s + 1], g);
-      if (s > 0 && g) line(personColor(src[doors[s - 1].p], doors[s - 1].p), null, null, g, true);
+      line(c, stops[s], stops[s + 1], g, false, i);
+      if (s > 0 && g) line(personColor(src[doors[s - 1].p], doors[s - 1].p), null, null, g, true, doors[s - 1].p);
     }
     const base = routeNow(p, R);
-    if (!doors.length && base) mine.forEach(q => line(personColor(src[q.p], q.p), null, null, base.g.slice(q.idx), true));
+    if (!doors.length && base) mine.forEach(q => line(personColor(src[q.p], q.p), null, null, base.g.slice(q.idx), true, q.p));
   });
   map.getSource("lines").setData({ type: "FeatureCollection", features: feats });
   pickupMarkers.forEach(mk => mk.remove());
   pickupMarkers = plan.filter(m => m.kind === "route").map(m => {
     const el = document.createElement("div"); el.className = "pk"; el.textContent = "🤝";
     el.style.borderColor = personColor(src[m.d], m.d); el.title = "נקודת איסוף";
-    return new maplibregl.Marker({ element: el }).setLngLat([m.x.lon, m.x.lat]).addTo(map);
+    el.addEventListener("click", ev => { ev.stopPropagation(); focusPickup(m); });
+    const mk = new maplibregl.Marker({ element: el }).setLngLat([m.x.lon, m.x.lat]).addTo(map); mk._m = m; return mk;
   });
+  fadeMarkers();
 }
 async function drawResult() {
   if (!results || !map.getSource("lines")) return;
@@ -592,6 +639,7 @@ async function drawResult() {
     const el = document.createElement("div"); el.className = "pin";
     el.innerHTML = '<svg width="38" height="50" viewBox="-3 -3 42 54"><path d="M18 0C8 0 0 8 0 18c0 13.5 18 30 18 30s18-16.5 18-30C36 8 28 0 18 0z" stroke="#fff" stroke-width="3"/><circle cx="18" cy="18" r="6.5" fill="#fff"/></svg>';
     resultMarker = new maplibregl.Marker({ element: el, anchor: "bottom" }).setLngLat([R.lon, R.lat]).addTo(map);
+    el.addEventListener("click", ev => { ev.stopPropagation(); clearFocus(); fitAll([results[mode].lon, results[mode].lat]); });
   }
   resultMarker.setLngLat([R.lon, R.lat]);
   resultMarker.getElement().querySelector("path").setAttribute("fill", c);
