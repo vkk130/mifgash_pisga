@@ -36,7 +36,7 @@ d_i(x) = OSRM road distance from person i to point x.
 
 ## State & sharing
 - All state lives in the URL hash: base64url(JSON `{p:[[name,lat,lon]...]}`), coords rounded to 4 decimals (older links with addr/`m` still load). Opening such a link re-runs the calculation (deterministic for the same input).
-- Share message (Hillel's spec): only the two points (fastest + fairest, merged into one if they're within ~300 m), each with a one-line explanation of how it was chosen; then a short link to the result page (per-person distances + routes); then "רוצים לבדוק בעצמכם? כנסו ל-<site root>". No per-person lines in the message.
+- Share message (Hillel's spec): only the two points (fastest + fairest, merged into one if they're within ~300 m), each with a one-line explanation of how it was chosen; then a short link to the result page (per-person distances + routes); then "רוצים לבדוק בעצמכם? כנסו ל-<site root>". Each point has a Waze link (`waze.com/ul?ll=lat,lon`). No per-person lines in the message.
 - The result link is shortened with is.gd (JSONP, no key, 5 s timeout, falls back to the long link). Hillel wants a normal-size link, not a huge one.
 - The funny lines (`BANK`) now appear on the site under each name in the results table, not in the message.
 - Share via `wa.me/?text=` (window opened synchronously, then navigated, to avoid popup blocking) or copy (ClipboardItem with a promise for iOS).

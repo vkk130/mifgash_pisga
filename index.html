@@ -508,7 +508,7 @@ async function osrmRoute(a, b) {
   if (j.code !== "Ok") throw new Error(j.code);
   return j.routes[0].geometry.coordinates;
 }
-const wazeUrl = R => `https://waze.com/ul?ll=${R.lat.toFixed(6)},${R.lon.toFixed(6)}&navigate=yes`;
+const wazeUrl = R => `https://waze.com/ul?ll=${R.lat.toFixed(5)},${R.lon.toFixed(5)}`;
 const gmapsUrl = R => `https://www.google.com/maps/search/?api=1&query=${R.lat.toFixed(6)},${R.lon.toFixed(6)}`;
 
 async function reverseName(lat, lon, broad) {
@@ -588,9 +588,9 @@ async function shareText() {
   const [nS, nF, link] = await Promise.all([placeName(S), placeName(F), shortUrl(location.href)]);
   const same = Math.abs(S.lat - F.lat) < 0.003 && Math.abs(S.lon - F.lon) < 0.003;
   const pts = same
-    ? [`📍 *ליד ${nS}*`, `הפעם שתי השיטות הסכימו: זו גם הנקודה הכי קצרה לכולנו ביחד (${km(S.sum)} ק״מ סה״כ) וגם הכי הוגנת (אף אחד לא נוסע יותר מ-${km(F.max)} ק״מ).`]
-    : [`⚡ *הכי קצר ביחד: ליד ${nS}*`, `הנקודה שבה סך הקילומטרים של כולנו הכי נמוך: ${km(S.sum)} ק״מ.`, "",
-       `⚖️ *הכי הוגן: ליד ${nF}*`, `הנקודה שבה מי שנוסע הכי הרבה נוסע כמה שפחות: מקסימום ${km(F.max)} ק״מ.`];
+    ? [`📍 *ליד ${nS}*`, `🚗 ${wazeUrl(S)}`, `הפעם שתי השיטות הסכימו: זו גם הנקודה הכי קצרה לכולנו ביחד (${km(S.sum)} ק״מ סה״כ) וגם הכי הוגנת (אף אחד לא נוסע יותר מ-${km(F.max)} ק״מ).`]
+    : [`⚡ *הכי קצר ביחד: ליד ${nS}*`, `🚗 ${wazeUrl(S)}`, `הנקודה שבה סך הקילומטרים של כולנו הכי נמוך: ${km(S.sum)} ק״מ.`, "",
+       `⚖️ *הכי הוגן: ליד ${nF}*`, `🚗 ${wazeUrl(F)}`, `הנקודה שבה מי שנוסע הכי הרבה נוסע כמה שפחות: מקסימום ${km(F.max)} ק״מ.`];
   return [
     "⛰️ מצאנו איפה נפגשים!",
     "",
