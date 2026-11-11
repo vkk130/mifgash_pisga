@@ -173,6 +173,7 @@ map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-le
 const markers = {};
 let resultMarker = null;
 map.on("load", () => {
+  hebrewLabels();
   map.addSource("lines", { type: "geojson", data: emptyFC() });
   map.addLayer({ id: "lines-casing", type: "line", source: "lines", layout: { "line-join": "round", "line-cap": "round" },
     paint: { "line-color": "#fff", "line-width": ["interpolate", ["linear"], ["zoom"], 7, 5, 13, 9], "line-opacity": ["case", ["==", ["get", "road"], 1], 0.95, 0] } });
@@ -192,6 +193,19 @@ map.on("click", e => {
   renderPeople(); syncMarkers();
   reverseName(p.lat, p.lon).then(n => { if (n) { p.addr = n; renderPeople(); } });
 });
+// Hebrew labels everywhere; drop the "Palestinian territories" country label.
+function hebrewLabels() {
+  const any = ["coalesce", ["get", "name:en"], ["get", "name:latin"], ["get", "name"], ""];
+  const he = ["coalesce", ["get", "name:he"], ["get", "name"], ""];
+  const label = ["case",
+    ["any", ["in", "Palestin", any], ["in", "פלסטינ", he], ["in", "West Bank", any], ["in", "Gaza Strip", any]], "",
+    he];
+  for (const layer of map.getStyle().layers) {
+    if (layer.type !== "symbol") continue;
+    const tf = map.getLayoutProperty(layer.id, "text-field");
+    if (tf && JSON.stringify(tf).includes("name")) map.setLayoutProperty(layer.id, "text-field", label);
+  }
+}
 function emptyFC() { return { type: "FeatureCollection", features: [] }; }
 const color = i => COLORS[i % COLORS.length];
 const initial = n => (n || "?").trim().charAt(0) || "?";
