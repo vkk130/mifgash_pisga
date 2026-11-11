@@ -9,6 +9,7 @@
 6. Map: per-person coloured road routes (OSRM `/route`), thicker lines with casing, straight SVG pin.
 7. Map labels in Hebrew; Palestinian territories / West Bank / Gaza Strip labels hidden.
 8. Removed the share-message preview; added the math explanation to "איך זה עובד?"; added the rights footer; added these agent docs.
+9. Funny-line bank expanded to 12 lines per distance tier (84 total), gender-neutral; no line repeats within one message (`resetPools`/`funnyLine`).
 
 ## Not yet verified in a real browser
 The agent environment can't reach the map/OSRM/Photon/Nominatim servers, so items 3–8 were only syntax-checked (`node --check`). Hillel's feedback is the test. Specifically unconfirmed:
