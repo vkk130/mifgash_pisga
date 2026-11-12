@@ -87,7 +87,7 @@ function render() {
   (D.no || []).forEach(p => rows.push(`<div class="rc"><div class="pair" aria-hidden="true">${dot(p)}</div><div>לא מצאנו מי ייקח את ${B(p)}.<small>אולי מישהו מתנדב?</small></div></div>`));
   $("#list").innerHTML = rows.length ? rows.join("") : `<div class="empty">הפעם אין טרמפ שמשתלם. כל אחד בא עם הרכב שלו.</div>`;
   // Full map link: same people/mode the main page understands.
-  const back = { p: D.n }; if (D.r) back.r = D.r; if (D.m === "fair") back.m = "fair";
+  const back = { p: D.n }; if (D.r) back.r = D.r; if (D.m === "fair" || D.m === "mine") back.m = D.m; if (D.f) back.f = D.f;
   $("#full").href = "./#" + b64e(JSON.stringify(back));
 }
 </script>
