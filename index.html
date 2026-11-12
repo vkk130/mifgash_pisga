@@ -11,19 +11,21 @@
 <style>
   :root{
     --bg:#f6f3ec; --ink:#1d2a2a; --muted:#6b7672; --card:#fffdf8; --line:#e3ddcf;
-    --a:#e0592a; /* efficient */ --b:#2a7f6f; /* fair */ --accent:#1d2a2a;
+    --a:#e0592a; /* efficient */ --b:#2a7f6f; /* fair */ --c:#4f46e5; /* our flag */ --accent:#1d2a2a;
+    --hi:var(--a); /* site highlight, turns indigo on the flag tab */
   }
   *{box-sizing:border-box}
   html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Rubik,system-ui,sans-serif}
   body{min-height:100vh}
   header{padding:22px 18px 8px;max-width:1100px;margin:auto}
   h1{margin:0;font-size:30px;font-weight:800;letter-spacing:-.5px}
-  h1 span{color:var(--a)}
+  h1 span{color:var(--hi);transition:color .3s}
+  body.mine{--hi:var(--c)}
   .slogan{margin:2px 0 0;font-size:19px;font-weight:700}
   .sub{color:var(--muted);margin:6px 0 0;font-size:15px;line-height:1.5;max-width:560px}
   .steps{list-style:none;padding:0;margin:12px 0 0;display:flex;gap:6px;flex-wrap:wrap;counter-reset:s}
   .steps li{counter-increment:s;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:5px 12px 5px 10px;font-size:14px}
-  .steps li::before{content:counter(s);display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--a);color:#fff;font-size:12px;font-weight:700;margin-left:6px}
+  .steps li::before{content:counter(s);display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--hi);color:#fff;font-size:12px;font-weight:700;margin-left:6px}
   main{max-width:1100px;margin:auto;padding:10px 18px 40px;display:grid;gap:18px;grid-template-columns:400px minmax(0,1fr);grid-template-areas:"form map" "res map";align-items:start}
   main>section{min-width:0}
   #formSec{grid-area:form} #mapSec{grid-area:map;position:sticky;top:12px} #results{grid-area:res}
@@ -52,11 +54,15 @@
   .hint{font-size:13px;color:var(--muted);margin-top:10px;line-height:1.5}
   #map{height:440px;border-radius:16px;overflow:hidden;border:1px solid var(--line)}
   @media (max-width:860px){#map{height:340px}}
-  .picking #map{outline:3px solid var(--a)}
+  .picking #map{outline:3px solid var(--hi)}
   .progress{height:6px;background:#ece6d8;border-radius:6px;overflow:hidden;margin-top:12px;display:none}
-  .progress i{display:block;height:100%;width:0;background:var(--a);transition:width .3s}
+  .progress i{display:block;height:100%;width:0;background:var(--hi);transition:width .3s}
   .status{font-size:14px;color:var(--muted);margin-top:6px;min-height:20px}
   .tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .tabs.three{grid-template-columns:1fr 1fr 1fr}
+  .tab.c{display:none} .tabs.three .tab.c{display:block}
+  .tab.on.c{border-color:var(--c);background:#eeedfb}
+  @media (max-width:520px){.tabs.three .tab small{display:none} .tabs.three .tab b{font-size:14px}}
   @media (max-width:420px){.tab small{display:none} .tab b{font-size:15px} .share{flex-direction:column} .totals{gap:8px 14px}}
   .tab{border:2px solid var(--line);border-radius:14px;padding:12px;background:var(--card);cursor:pointer;text-align:right;font:inherit;color:var(--ink)}
   .tab b{display:block;font-size:16px}
@@ -128,6 +134,21 @@
   .pop a{display:inline-block;margin-top:4px}
   .pk{width:24px;height:24px;border-radius:50%;background:#fff;border:3px solid;display:grid;place-items:center;font-size:12px;box-shadow:0 2px 6px #0003}
   .newrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .flagrow{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}
+  .dot.flag{background:var(--c);font-size:14px}
+  .fm{width:30px;height:30px;border-radius:50%;background:var(--c);border:2px solid #fff;box-shadow:0 2px 6px #0004;display:grid;place-items:center;font-size:15px;cursor:pointer}
+  #mineStats{display:none;margin-top:12px}
+  body.mine #mineStats{display:block}
+  .verdict{font-size:17px;font-weight:700;margin-bottom:8px}
+  .scores{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .score{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff}
+  .score>b{display:block;font-size:24px;font-variant-numeric:tabular-nums}
+  .score small{color:var(--muted);font-size:13px;line-height:1.4;display:block}
+  .meter{height:6px;background:#ece6d8;border-radius:6px;overflow:hidden;margin:6px 0 4px}
+  .meter i{display:block;height:100%}
+  .vs{font-size:14px;line-height:1.6;margin-top:10px;color:var(--ink)}
+  .vs div{padding:4px 0}
+  .mins{font-weight:400;color:var(--muted);font-size:13px;display:block}
   footer{text-align:center;color:var(--muted);font-size:12px;padding:0 18px 24px}
   footer a{color:inherit}
 </style>
@@ -144,6 +165,12 @@
   <section id="formSec">
     <div class="card">
       <div class="people" id="people"></div>
+      <div class="row flagrow" id="flagRow">
+        <div class="dot flag">🚩</div>
+        <div class="fields"><input class="addr" id="flagAddr" data-f="addr" placeholder="יש לכם כבר מקום? (לא חובה)" autocomplete="off"></div>
+        <button class="iconbtn" title="בחירה במפה" id="flagPick">📍</button>
+        <button class="del" title="הסרה" id="flagDel">×</button>
+      </div>
       <div class="actions">
         <button class="btn ghost" id="add">+ עוד מישהו</button>
         <button class="btn go" id="calc" disabled>מצאו לנו נקודה</button>
@@ -151,7 +178,7 @@
       <div class="progress" id="progress"><i></i></div>
       <div class="status" id="status"></div>
       <div class="newrow"><button class="chip" id="newMeet">✨ מפגש חדש</button><button class="chip" id="dupList">📋 אותם אנשים, מפגש חדש</button></div>
-      <div class="hint">מקלידים ובוחרים מהרשימה. מעדיפים לסמן? לוחצים על 📍 ואז על המפה. עד 25 אנשים. מישהו בלי רכב? מעבירים לו את המתג ל"צריך טרמפ" ונמצא מי יאסוף.</div>
+      <div class="hint">מקלידים ובוחרים מהרשימה. מעדיפים לסמן? לוחצים על 📍 ואז על המפה. עד 25 אנשים. מישהו בלי רכב? מעבירים לו את המתג ל"צריך טרמפ" ונמצא מי יאסוף. כבר יש לכם מקום בראש? שמים אותו ב-🚩 ונגיד לכם כמה הוא הוגן.</div>
     </div>
   </section>
 
@@ -160,13 +187,15 @@
   </section>
 
   <section id="results">
-      <div class="tabs">
+      <div class="tabs" id="tabs">
         <button class="tab a on" data-k="sum"><b>⚡ הכי קצר ביחד</b><small>כמה שפחות ק״מ לכל החבר׳ה</small></button>
         <button class="tab b" data-k="fair"><b>⚖️ הכי הוגן</b><small>אף אחד לא נדפק בנסיעה</small></button>
+        <button class="tab c" data-k="mine"><b>🚩 הנקודה שלנו</b><small>כמה היא הוגנת באמת?</small></button>
       </div>
       <div class="card" style="margin-top:10px">
         <div class="place" id="place"></div>
         <div class="nav" id="nav"></div>
+        <div id="mineStats"></div>
         <table id="table"></table>
         <div class="totals" id="totals"></div>
         <div class="share">
@@ -184,6 +213,8 @@
           <p>הכי הוגן מחפש את הנקודה שממזערת את המקסימום (בעיית minimax). אם יש תיקו, מכריע הסכום:</p>
           <div class="math">x* = argmin<sub>x</sub> max<sub>i</sub> d<sub>i</sub>(x)</div>
           <p>אין לזה נוסחה סגורה, כי מרחק בכביש תלוי ברשת הכבישים. לכן מחפשים ברשת: בסבב הראשון פורשים רשת ריבועית של n×n נקודות על האזור של כל המשתתפים (פלוס 10%), כאשר n = ⌊√(100 − P)⌋ ו-P הוא מספר המשתתפים. בכל אחד משלושת הסבבים הבאים פורשים רשת חדשה וצפופה יותר סביב הנקודה הטובה ביותר לכל אחת משתי השיטות, ברוחב של צעד אחד מהרשת הקודמת. כל נקודה מוצמדת לכביש הקרוב, והמרחקים מגיעים מ-OSRM.</p>
+          <p><b>הנקודה שלנו 🚩:</b> בודקים לכל אחד כמה ק״מ ודקות ייקח לו להגיע לנקודה שבחרתם, ומשווים לשתי הנקודות שמצאנו. ציון ההוגנות הוא כמה הנסיעה הכי ארוכה קרובה לזו שבנקודה הכי הוגנת, וציון היעילות הוא אותו דבר לסך הקילומטרים (100% = לא היה אפשר יותר טוב):</p>
+          <div class="math">הוגנות = max<sub>i</sub> d<sub>i</sub>(x<sub>fair</sub>) / max<sub>i</sub> d<sub>i</sub>(x) · יעילות = Σ d<sub>i</sub>(x<sub>sum</sub>) / Σ d<sub>i</sub>(x)</div>
           <p><b>נוסעים ביחד:</b> אחרי שיש נקודה, בודקים לכל זוג נהג ונוסע שתי אפשרויות: הנהג אוסף מהבית, או שנפגשים בנקודה x על המסלול של הנהג. לכל אפשרות מחשבים כמה זמן נסיעה ברכב נפרד נחסך (t הוא זמן נסיעה, R הנקודה, Δ<sub>d</sub> הסיבוב של הנהג):</p>
           <div class="math">s = t(p,R) − t(p,x) − Δ<sub>d</sub></div>
           <p>מציעים אם הסיבוב של מי שעושה אותו (נהג או נוסע) הוא עד 15% מהנסיעה שלו, או עד 10 דק׳ בכל מקרה, ולא יותר מ-20 דק׳. אם המסלולים חופפים ב-90% מהדרך או יותר, מציעים גם בסיבוב של עד 20 דק׳. הסיבוב על חשבון הזמן של מי שעושה אותו, והנקודה עצמה לא זזה. את הזוגות משבצים לפי החיסכון מהגדול לקטן (שיטת החיסכון של Clarke–Wright), וקודם כל את מי שצריך טרמפ.</p>
@@ -220,7 +251,9 @@ const $ = s => document.querySelector(s);
 let people = [];   // {id, name, addr, lat, lon}
 let nextId = 1;
 let picking = null;
-let results = null; // {sum:{lat,lon,d:[]}, fair:{...}}
+let results = null; // {sum:{lat,lon,d:[],t?:[]}, fair:{...}, mine?:{...}}
+const flag = { id: "flag", addr: "", lat: null, lon: null };   // the point the group picked themselves (optional)
+let flagMarker = null;
 let mode = "sum";
 const placeNames = {};
 
@@ -252,6 +285,13 @@ map.on("load", () => {
 map.on("click", e => {
   if (e.originalEvent?.target?.closest?.(".pm,.pk,.pin")) return;
   if (!picking) { if (focusSet) clearFocus(); return; }
+  if (picking === "flag") {
+    setPicking(null);
+    flag.lat = e.lngLat.lat; flag.lon = e.lngLat.lng; flag.addr = "נקודה במפה";
+    onFlagSet();
+    reverseName(flag.lat, flag.lon).then(n => { if (n && flag.addr === "נקודה במפה") { flag.addr = n; renderFlag(); } });
+    return;
+  }
   const p = people.find(x => x.id === picking);
   setPicking(null);
   if (!p) return;
@@ -317,16 +357,100 @@ $("#people").addEventListener("click", e => {
   if (ride) {
     const p = people.find(x => x.id == ride); p.ride = !p.ride; renderPeople();
     const s = results?.src.find(x => x.id === p.id);
-    if (s) { s.ride = p.ride; const was = pool[mode]; pool = { sum: null, fair: null }; sharePromise = null; writeHash(); if (was) computePool(mode); else renderPool(); }
+    if (s) { s.ride = p.ride; const was = pool[mode]; pool = { sum: null, fair: null, mine: null }; sharePromise = null; writeHash(); if (was) computePool(mode); else renderPool(); }
   }
   if (del) { people = people.filter(p => p.id != del); renderPeople(); syncMarkers(); }
   if (pick) setPicking(picking == pick ? null : +pick);
 });
+
+// ---------- our own point (🚩) ----------
+function renderFlag() {
+  const inp = $("#flagAddr");
+  if (document.activeElement !== inp) inp.value = flag.addr;
+  inp.classList.toggle("ok", flag.lat != null);
+  $("#flagPick").classList.toggle("on", picking === "flag");
+  $("#flagDel").style.visibility = flag.addr || flag.lat != null ? "visible" : "hidden";
+}
+function syncFlagMarker() {
+  const hide = flag.lat == null || (mode === "mine" && results?.mine);
+  if (hide) { flagMarker?.remove(); flagMarker = null; return; }
+  if (!flagMarker) {
+    const el = document.createElement("div"); el.className = "fm"; el.textContent = "🚩"; el.title = "הנקודה שלנו";
+    el.addEventListener("click", ev => { ev.stopPropagation(); if (results?.mine) { mode = "mine"; sharePromise = null; showResults(); } });
+    flagMarker = new maplibregl.Marker({ element: el }).setLngLat([flag.lon, flag.lat]).addTo(map);
+  }
+  flagMarker.setLngLat([flag.lon, flag.lat]);
+}
+function onFlagSet() {
+  renderFlag(); syncFlagMarker(); updateCalc();
+  if (results) evaluateMine(); else fitAll([flag.lon, flag.lat]);
+}
+function clearFlag() {
+  flag.addr = ""; flag.lat = flag.lon = null; closeSugg();
+  if (results?.mine) { delete results.mine; pool.mine = null; if (mode === "mine") mode = "fair"; sharePromise = null; writeHash(); showResults(); }
+  renderFlag(); syncFlagMarker(); updateCalc();
+}
+$("#flagPick").onclick = () => setPicking(picking === "flag" ? null : "flag");
+$("#flagDel").onclick = clearFlag;
+$("#flagAddr").addEventListener("input", e => {
+  flag.addr = e.target.value; flag.lat = flag.lon = null;
+  e.target.classList.remove("ok"); syncFlagMarker();
+  $("#flagDel").style.visibility = flag.addr ? "visible" : "hidden";
+  clearTimeout(suggTimer);
+  suggTimer = setTimeout(() => suggest(e.target, flag), 300);
+});
+// Distances + minutes from everyone to our point, and (same call) to the two computed points for comparison.
+async function evaluateMine() {
+  if (!results || flag.lat == null) return;
+  const st = $("#status"); st.textContent = "בודקים את הנקודה שלכם…";
+  try {
+    const S = results.sum, F = results.fair;
+    const { dist, dur, snapped } = await osrmTable(results.src, [{ lat: flag.lat, lon: flag.lon }, S, F], "distance,duration");
+    const col = (m, j) => m.map(row => row[j]);
+    const d = col(dist, 0);
+    if (d.some(v => v == null)) throw new Error("לא מצאנו דרך לנקודה הזו ברכב");
+    S.t = col(dur, 1); F.t = col(dur, 2);
+    const M = { lat: snapped[0].lat, lon: snapped[0].lon, d, t: col(dur, 0), sum: d.reduce((a, b) => a + b, 0), max: Math.max(...d) };
+    if (flag.addr && flag.addr !== "נקודה במפה") placeNames[nameKey(M)] = flag.addr;
+    results.mine = M; pool.mine = null; sharePromise = null;
+    mode = "mine"; st.textContent = "";
+    writeHash(); syncFlagMarker(); await showResults();
+  } catch (e) {
+    st.textContent = "לא הצלחנו לבדוק את הנקודה: " + (e.message || e) + ". נסו שוב או נקודה אחרת.";
+  }
+}
+// Scores, verdict and the comparison with the two computed points (all from the same numbers in the table).
+function mineStats() {
+  const M = results.mine, S = results.sum, F = results.fair, src = results.src;
+  const fairPct = Math.min(100, Math.round(100 * F.max / M.max)), sumPct = Math.min(100, Math.round(100 * S.sum / M.sum));
+  const verdict = fairPct >= 95 ? "הוגנת לגמרי. אין על מה להתווכח 👌" : fairPct >= 85 ? "די הוגנת. אפשר לחיות עם זה 👍"
+    : fairPct >= 70 ? "מישהו פה קצת נדפק 😬" : "מישהו פה ממש נדפק. אולי לחשוב שוב? 🙈";
+  const mt = (sec) => sec == null ? "" : `${mins(sec)} דק׳`;
+  const sign = (v, f) => (v > 0 ? "+" : v < 0 ? "−" : "") + f(Math.abs(v));
+  const iMax = M.d.indexOf(M.max), iMaxF = F.d.indexOf(F.max);
+  // who pays most for this choice compared with the fairest point
+  let loser = 0; M.d.forEach((v, i) => { if (v - F.d[i] > M.d[loser] - F.d[loser]) loser = i; });
+  const lossKm = M.d[loser] - F.d[loser], lossT = M.t && F.t ? M.t[loser] - F.t[loser] : null;
+  const avgT = M.t ? M.t.reduce((a, b) => a + b, 0) / M.t.length : null;
+  const nm = i => `<b>${esc(src[i].name.trim())}</b>`;
+  const meter = (pct, c) => `<div class="meter"><i style="width:${pct}%;background:${c}"></i></div>`;
+  return `<div class="verdict">${verdict}</div>
+    <div class="scores">
+      <div class="score"><small>⚖️ הוגנות</small><b>${fairPct}%</b>${meter(fairPct, "var(--b)")}<small>הכי רחוק: ${nm(iMax)}, ${km(M.max)} ק״מ${M.t ? ` · ${mt(M.t[iMax])}` : ""}</small></div>
+      <div class="score"><small>⚡ יעילות</small><b>${sumPct}%</b>${meter(sumPct, "var(--a)")}<small>כולם ביחד: ${km(M.sum)} ק״מ${avgT != null ? ` · ממוצע ${mt(avgT)}` : ""}</small></div>
+    </div>
+    <div class="vs">
+      <div>⚖️ <b>מול הכי הוגן</b> (ליד ${esc(placeNames[nameKey(F)] || "הנקודה ההוגנת")}): הנסיעה הכי ארוכה כאן ${M.max - F.max > 500 ? `ארוכה יותר ב-${km(M.max - F.max)} ק״מ` : "כמעט זהה"} (שם: ${nm(iMaxF)}, ${km(F.max)} ק״מ).</div>
+      <div>⚡ <b>מול הכי קצר ביחד</b> (ליד ${esc(placeNames[nameKey(S)] || "הנקודה היעילה")}): ${M.sum - S.sum > 500 ? `כולם ביחד נוסעים עוד ${km(M.sum - S.sum)} ק״מ` : "כמעט אותו סך קילומטרים"}.</div>
+      ${lossKm > 1000 ? `<div>😅 <b>הכי מפסיד מהבחירה:</b> ${nm(loser)}, ${sign(lossKm, km)} ק״מ${lossT != null && lossT > 60 ? ` (${sign(lossT, mt)})` : ""} לעומת הנקודה ההוגנת.</div>` : ""}
+      ${fairPct >= 100 && M.max < F.max - 500 ? `<div>😮 הנקודה שלכם אפילו יותר הוגנת ממה שמצאנו. כל הכבוד.</div>` : ""}
+    </div>`;
+}
 function setPicking(id) {
   picking = id;
   document.body.classList.toggle("picking", !!id);
-  if (id) { toast("לחצו על המפה כדי לבחור מיקום"); if (innerWidth < 860) $("#map").scrollIntoView({ behavior: "smooth", block: "center" }); }
-  renderPeople();
+  if (id) { toast(id === "flag" ? "לחצו על המפה איפה שנפגשים" : "לחצו על המפה כדי לבחור מיקום"); if (innerWidth < 860) $("#map").scrollIntoView({ behavior: "smooth", block: "center" }); }
+  renderPeople(); renderFlag();
 }
 
 // ---------- address autocomplete (Photon) ----------
@@ -346,7 +470,7 @@ $("#people").addEventListener("input", e => {
     suggTimer = setTimeout(() => suggest(e.target, p), 300);
   }
 });
-$("#people").addEventListener("keydown", e => {
+$("#formSec").addEventListener("keydown", e => {
   if (!suggBox || e.target.dataset.f !== "addr") return;
   if (e.key === "ArrowDown" || e.key === "ArrowUp") {
     e.preventDefault();
@@ -382,7 +506,9 @@ async function suggest(input, p) {
       ev.preventDefault();
       p.lat = f.geometry.coordinates[1]; p.lon = f.geometry.coordinates[0];
       p.addr = [main, pr.city && pr.city !== main ? pr.city : ""].filter(Boolean).join(", ");
-      closeSugg(); renderPeople(); syncMarkers(); fitAll();
+      closeSugg();
+      if (p === flag) return onFlagSet();
+      renderPeople(); syncMarkers(); fitAll();
     });
     suggBox.appendChild(d);
   });
@@ -514,11 +640,12 @@ async function runCalc() {
   try {
     const best = await optimise(src, f => { $("#progress i").style.width = (f * 100) + "%"; });
     results = { src: src.map(p => ({ ...p })), sum: best.sum, fair: best.fair };
-    pool = { sum: null, fair: null };
+    pool = { sum: null, fair: null, mine: null };
     sharePromise = null;
     $("#status").textContent = "";
-    writeHash();
-    await showResults();
+    if (mode === "mine") mode = "sum";
+    if (flag.lat != null) await evaluateMine();
+    if (!results.mine) { writeHash(); await showResults(); }
     if (innerWidth < 860) setTimeout(() => $("#mapSec").scrollIntoView({ behavior: "smooth", block: "start" }), 700);
   } catch (e) {
     $("#status").textContent = "אופס, משהו השתבש: " + (e.message || e) + ". נסו שוב בעוד רגע.";
@@ -535,18 +662,28 @@ const km = m => { const k = m / 1000; return k < 10 ? k.toFixed(1).replace(/\.0$
 async function showResults() {
   if (!results) return;
   focusSet = null; focusPopup?.remove(); focusPopup = null;
+  if (mode === "mine" && !results.mine) mode = "fair";
   document.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.dataset.k === mode));
+  $("#tabs").classList.toggle("three", !!results.mine);
+  document.body.classList.toggle("mine", mode === "mine");
+  syncFlagMarker();
   $("#results").style.display = "block";
   const R = results[mode], src = results.src;
   const key = R.lat.toFixed(4) + "," + R.lon.toFixed(4);
-  $("#place").textContent = placeNames[key] ? "📍 ליד " + placeNames[key] : "📍 מחפשים שם למקום…";
-  if (!placeNames[key]) reverseName(R.lat, R.lon, true).then(n => { placeNames[key] = n || "הנקודה שבמפה"; if (results[mode] === R) $("#place").textContent = "📍 ליד " + placeNames[key]; });
+  const ico = mode === "mine" ? "🚩 " : "📍 ";
+  $("#place").textContent = placeNames[key] ? ico + "ליד " + placeNames[key] : ico + "מחפשים שם למקום…";
+  if (!placeNames[key]) reverseName(R.lat, R.lon, true).then(n => { placeNames[key] = n || "הנקודה שבמפה"; if (results[mode] === R) $("#place").textContent = ico + "ליד " + placeNames[key]; });
+  if (mode === "mine") {
+    $("#mineStats").innerHTML = mineStats();
+    for (const k of ["sum", "fair"]) if (!placeNames[nameKey(results[k])]) placeName(results[k]).then(() => { if (mode === "mine" && results.mine === R) $("#mineStats").innerHTML = mineStats(); });
+  }
   $("#nav").innerHTML = `<a target="_blank" href="${wazeUrl(R)}">🚗 Waze</a><a target="_blank" href="${gmapsUrl(R)}">🗺️ Google Maps</a>`;
   const maxD = Math.max(...R.d);
   const order = src.map((p, i) => ({ p, i, d: R.d[i] })).sort((a, b) => b.d - a.d);
   resetPools();
-  $("#table").innerHTML = order.map(o => `<tr><td>${esc(o.p.name)}<div class="quip">${esc(funnyLine(o.d))}</div><div class="bar" style="width:${Math.max(4, 100 * o.d / maxD)}%;background:${color(people.findIndex(x => x.id === o.p.id) < 0 ? o.i : people.findIndex(x => x.id === o.p.id))}"></div></td><td class="km">${km(o.d)} ק״מ</td></tr>`).join("");
-  $("#totals").innerHTML = `<span>סך הכל: <b>${km(R.sum)} ק״מ</b></span><span>הכי רחוק: <b>${km(R.max)} ק״מ</b></span><span>פער: <b>${km(R.max - Math.min(...R.d))} ק״מ</b></span>`;
+  $("#table").innerHTML = order.map(o => `<tr><td>${esc(o.p.name)}<div class="quip">${esc(funnyLine(o.d))}</div><div class="bar" style="width:${Math.max(4, 100 * o.d / maxD)}%;background:${color(people.findIndex(x => x.id === o.p.id) < 0 ? o.i : people.findIndex(x => x.id === o.p.id))}"></div></td><td class="km">${km(o.d)} ק״מ${R.t?.[o.i] != null ? `<span class="mins">${mins(R.t[o.i])} דק׳</span>` : ""}</td></tr>`).join("");
+  const tMax = R.t ? Math.max(...R.t) : null, tMin = R.t ? Math.min(...R.t) : null;
+  $("#totals").innerHTML = `<span>סך הכל: <b>${km(R.sum)} ק״מ</b></span><span>הכי רחוק: <b>${km(R.max)} ק״מ</b>${tMax != null ? ` (${mins(tMax)} דק׳)` : ""}</span><span>פער: <b>${km(R.max - Math.min(...R.d))} ק״מ</b>${tMax != null ? ` (${mins(tMax - tMin)} דק׳)` : ""}</span>${R.t ? `<span>ממוצע: <b>${mins(R.t.reduce((a, b) => a + b, 0) / R.t.length)} דק׳</b></span>` : ""}`;
   drawResult();
   renderPool();
   if (!sharePromise) { writeHash(); prepareShare(); }
@@ -636,7 +773,7 @@ async function drawResult() {
   if (!results || !map.getSource("lines")) return;
   const token = ++drawToken;
   const R = results[mode];
-  const c = mode === "sum" ? "#e0592a" : "#2a7f6f";
+  const c = { sum: "#e0592a", fair: "#2a7f6f", mine: "#4f46e5" }[mode];
   if (!resultMarker) {
     const el = document.createElement("div"); el.className = "pin";
     el.innerHTML = '<svg width="38" height="50" viewBox="-3 -3 42 54"><path d="M18 0C8 0 0 8 0 18c0 13.5 18 30 18 30s18-16.5 18-30C36 8 28 0 18 0z" stroke="#fff" stroke-width="3"/><circle cx="18" cy="18" r="6.5" fill="#fff"/></svg>';
@@ -680,7 +817,7 @@ async function osrmRoute(a, b) {
 const POOL_SAMPLES = 30;
 const detourLimit = t => Math.min(Math.max(0.15 * t, 600), 1200);   // 15% of own trip, but 10 min is always fine; never over 20
 const OVERLAP = 0.9;   // routes that share ≥90% of the way are suggested even if the detour is a bit over the limit (≤20 min)
-let pool = { sum: null, fair: null };
+let pool = { sum: null, fair: null, mine: null };
 function routeSamples(r, n) {
   const g = r.g, last = g.length - 1, out = [];
   for (let k = 0; k < n; k++) {
@@ -871,7 +1008,7 @@ async function poolShareText() {
   const data = { n: hashData().p, m: mode, pt: [+R.lat.toFixed(5), +R.lon.toFixed(5), await placeName(R)],
     c: ent.plan.map(m => [m.kind === "door" ? 0 : 1, m.p, m.d, Math.round(m.extra), Math.round(m.leg || 0), Math.round((m.overlap || 0) * 100),
       m.x ? +m.x.lat.toFixed(5) : 0, m.x ? +m.x.lon.toFixed(5) : 0, m.idx > 0 ? m.where : "", m.over ? 1 : 0]) };
-  const rr = hashData().r; if (rr) data.r = rr;
+  const hd = hashData(); if (hd.r) data.r = hd.r; if (hd.f) data.f = hd.f;
   if (ent.none.length) data.no = ent.none;
   const link = await shortUrl(siteUrl().replace(/index\.html$/, "") + "rides.html#" + b64e(JSON.stringify(data)));
   return [
@@ -978,11 +1115,19 @@ async function shareText() {
     ? [`📍 *ליד ${nS}*`, `🚗 ${wazeUrl(S)}`, `הפעם שתי השיטות הסכימו: זו גם הנקודה הכי קצרה לכולנו ביחד (${km(S.sum)} ק״מ סה״כ) וגם הכי הוגנת (אף אחד לא נוסע יותר מ-${km(F.max)} ק״מ).`]
     : [`⚡ *הכי קצר ביחד: ליד ${nS}*`, `🚗 ${wazeUrl(S)}`, `הנקודה שבה סך הקילומטרים של כולנו הכי נמוך: ${km(S.sum)} ק״מ.`, "",
        `⚖️ *הכי הוגן: ליד ${nF}*`, `🚗 ${wazeUrl(F)}`, `הנקודה שבה מי שנוסע הכי הרבה נוסע כמה שפחות: מקסימום ${km(F.max)} ק״מ.`];
+  const M = results.mine;
+  if (M) {
+    const nM = await placeName(M), fairPct = Math.min(100, Math.round(100 * F.max / M.max)), sumPct = Math.min(100, Math.round(100 * S.sum / M.sum));
+    pts.unshift(`🚩 *הנקודה שבחרנו: ליד ${nM}*`, `🚗 ${wazeUrl(M)}`,
+      `⚖️ הוגנות ${fairPct}%: הכי רחוק נוסע ${km(M.max)} ק״מ (בנקודה הכי הוגנת: ${km(F.max)}).`,
+      `⚡ יעילות ${sumPct}%: כולנו ביחד ${km(M.sum)} ק״מ (הכי קצר אפשרי: ${km(S.sum)}).`, "", "ולהשוואה, מה שהאתר מצא:", "");
+  }
   const ent = pool[mode], rides = ent?.state === "done" ? poolLines(ent, n => `*${n}*`) : [];
-  const poolPart = rides.length ? ["", same ? "🤝 *נוסעים ביחד:*" : `🤝 *נוסעים ביחד* (בדרך ל${mode === "sum" ? "הכי קצר" : "הכי הוגן"}):`,
+  const where = { sum: "הכי קצר", fair: "הכי הוגן", mine: "הנקודה שבחרנו" }[mode];
+  const poolPart = rides.length ? ["", same && mode !== "mine" ? "🤝 *נוסעים ביחד:*" : `🤝 *נוסעים ביחד* (בדרך ל${where}):`,
     ...rides.map(l => `• ${l.main}` + (l.x ? `\n   📍 ${wazeUrl(l.x)}` : ""))] : [];
   return [
-    "⛰️ מצאנו איפה נפגשים!",
+    M ? "⛰️ בדקנו את הנקודה שלנו!" : "⛰️ מצאנו איפה נפגשים!",
     "",
     ...pts,
     ...poolPart,
@@ -1015,6 +1160,7 @@ function hashData() {
   const data = { p: results.src.map(p => [p.name, +p.lat.toFixed(4), +p.lon.toFixed(4)]) };
   const r = results.src.map((p, i) => p.ride ? i : -1).filter(i => i >= 0);
   if (r.length) data.r = r;
+  if (flag.lat != null) data.f = [+flag.lat.toFixed(5), +flag.lon.toFixed(5), flag.addr];
   return data;
 }
 function writeHash() { history.replaceState(null, "", "#" + b64e(JSON.stringify(hashData()))); }
@@ -1034,7 +1180,9 @@ function readHash() {
     const data = JSON.parse(b64d(location.hash.slice(1)));
     const rides = new Set(data.r || []);
     data.p.slice(0, MAX_PEOPLE).forEach(([name, lat, lon, addr], i) => addPerson({ name, lat, lon, addr: addr || "נקודה במפה", ride: rides.has(i) }));
-    if (data.m === "fair") mode = "fair";
+    if (data.m === "fair" || data.m === "mine") mode = data.m;
+    else if (data.f) mode = "mine";   // a link with our point opens on it
+    if (Array.isArray(data.f)) { flag.lat = data.f[0]; flag.lon = data.f[1]; flag.addr = data.f[2] || "נקודה במפה"; renderFlag(); syncFlagMarker(); }
     openRides = data.v === "rides";
     editOnly = !!data.e;
     return true;
@@ -1059,10 +1207,11 @@ if (readHash() && editOnly) {   // copied list: people only, no auto calculation
     $("#results").style.display = "block"; $("#pool").style.display = "block";
     $("#poolList").innerHTML = `<div class="pload" role="status"><span class="spin"></span><span>טוענים את הטרמפים. זה יכול לקחת עד 2 דקות…</span></div>`;
   }
-  runCalc().then(() => { mode = m; if (!results) return; showResults(); if (openRides) computePool(mode); });
+  runCalc().then(() => { mode = m === "mine" && !results?.mine ? "fair" : m; if (!results) return; showResults(); if (openRides) computePool(mode); });
 } else {
   addPerson(); addPerson(); addPerson();
 }
+renderFlag();
 </script>
 </body>
 </html>
