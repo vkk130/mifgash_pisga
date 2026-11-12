@@ -127,6 +127,7 @@
   .pop b{font-size:14px}
   .pop a{display:inline-block;margin-top:4px}
   .pk{width:24px;height:24px;border-radius:50%;background:#fff;border:3px solid;display:grid;place-items:center;font-size:12px;box-shadow:0 2px 6px #0003}
+  .newrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
   footer{text-align:center;color:var(--muted);font-size:12px;padding:0 18px 24px}
   footer a{color:inherit}
 </style>
@@ -149,6 +150,7 @@
       </div>
       <div class="progress" id="progress"><i></i></div>
       <div class="status" id="status"></div>
+      <div class="newrow"><button class="chip" id="newMeet">✨ מפגש חדש</button><button class="chip" id="dupList">📋 אותם אנשים, מפגש חדש</button></div>
       <div class="hint">מקלידים ובוחרים מהרשימה. מעדיפים לסמן? לוחצים על 📍 ואז על המפה. עד 25 אנשים. מישהו בלי רכב? מעבירים לו את המתג ל"צריך טרמפ" ונמצא מי יאסוף.</div>
     </div>
   </section>
@@ -1016,7 +1018,16 @@ function hashData() {
   return data;
 }
 function writeHash() { history.replaceState(null, "", "#" + b64e(JSON.stringify(hashData()))); }
-let openRides = false;
+let openRides = false, editOnly = false;
+// New meeting / copy list: open in a new tab so the current calculation stays as is.
+const baseUrl = () => location.origin + location.pathname;
+$("#newMeet").onclick = () => window.open(baseUrl(), "_blank");
+$("#dupList").onclick = () => {
+  const p = people.filter(x => x.lat != null).map(x => [x.name, +x.lat.toFixed(5), +x.lon.toFixed(5), x.addr]);
+  if (!p.length) return toast("אין עדיין אנשים עם מיקום להעתיק");
+  const r = people.filter(x => x.lat != null).map((x, i) => x.ride ? i : -1).filter(i => i >= 0);
+  window.open(baseUrl() + "#" + b64e(JSON.stringify(r.length ? { p, r, e: 1 } : { p, e: 1 })), "_blank");
+};
 function readHash() {
   if (location.hash.length < 3) return false;
   try {
@@ -1025,6 +1036,7 @@ function readHash() {
     data.p.slice(0, MAX_PEOPLE).forEach(([name, lat, lon, addr], i) => addPerson({ name, lat, lon, addr: addr || "נקודה במפה", ride: rides.has(i) }));
     if (data.m === "fair") mode = "fair";
     openRides = data.v === "rides";
+    editOnly = !!data.e;
     return true;
   } catch { return false; }
 }
@@ -1037,7 +1049,9 @@ let toastT;
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 2200); }
 
 // ---------- boot ----------
-if (readHash()) {
+if (readHash() && editOnly) {   // copied list: people only, no auto calculation
+  syncMarkers(); fitAll(); history.replaceState(null, "", location.pathname);
+} else if (people.length) {
   syncMarkers(); fitAll();
   const m = mode;
   if (openRides) {   // shared rides link: open straight into the rides view, with a spinner until it's ready
