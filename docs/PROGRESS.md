@@ -4,6 +4,7 @@ MVP live; mobile layout; copy + slogan; Hebrew place names/labels; coloured road
 - 2026-11-12: "🚩 הנקודה שלנו" — pick your own point (address or map pin): km+min per person, fairness/efficiency scores vs fairest & shortest, biggest loser, third tab (indigo), share message, rides; hash key `f`.
 - 2026-11-16: Form opens with a switch: "🔍 מצאו לנו נקודה" / "🚩 כבר יש לנו נקודה" (check mode: flag field on top, site turns indigo, button "כמה היא טובה?" needs the point). Flag hidden in find mode; a link with `f` opens in check mode.
 - 2026-11-16: frontend redesign (Karantina + IBM Plex Sans Hebrew, yellow main button, panel + full-height map on desktop, routes logo; rides.html matches); removed the "צריך טרמפ" switch and the steps pills. Checked with headless Chrome screenshots (no map tiles).
+- 2026-11-16 (b): second redesign after Hillel found the first generic: Israeli road signs on a sky background (green/blue/brown signs, yellow plates, condensed Noto Sans Hebrew). Name/address are two labelled fields with 📍 inside the address field. Carpool plate moved to the top of the result sign. Links now save the address each person typed; old links look it up (Nominatim, 1 req/s).
 ## Unverified (agent can't reach the map/routing servers)
 Mobile layout, Hebrew names, label filter, routes, is.gd links, carpool on real roads (tested only with a mock router, incl. 23 people + 25% refused requests).
 ## Next

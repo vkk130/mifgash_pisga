@@ -7,40 +7,44 @@
 <meta name="description" content="מי אוסף את מי בדרך למפגש.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Hebrew:wght@400;500;600;700&family=Karantina:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wdth,wght@62.5..100,100..900&display=swap" rel="stylesheet">
 <style>
-  /* Same tokens as index.html */
-  :root{--bg:#EEF2F6;--card:#fff;--soft:#F5F7FA;--ink:#111A36;--muted:#5C667E;--line:#D9E0EA;--sun:#FFD43B;
-    --display:Karantina,"IBM Plex Sans Hebrew",system-ui,sans-serif;--text:"IBM Plex Sans Hebrew",system-ui,sans-serif}
+  /* Same tokens and road-sign look as index.html */
+  :root{--sky:#C5E4F6;--ink:#13212E;--muted:#3F5567;--card:#fff;--soft:#EEF3F6;--green:#00703C;--brown:#6E4521;--yellow:#FFCB05;--font:"Noto Sans Hebrew",system-ui,sans-serif}
   *{box-sizing:border-box}
-  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--text)}
-  .wrap{max-width:620px;margin:auto;padding:20px 14px 30px}
-  .brand{display:inline-flex;align-items:center;gap:10px;font-size:18px;font-weight:700;color:var(--ink);text-decoration:none;border-radius:8px}
-  .logo{width:46px;height:36px;flex:none;overflow:visible}
-  .logo path{fill:none;stroke-width:4.5;stroke-linecap:round}
-  h1{margin:18px 0 6px;font-family:var(--display);font-size:clamp(52px,15vw,68px);line-height:.9;letter-spacing:.5px}
-  .where{color:var(--muted);font-size:16px;margin:0 0 16px;line-height:1.5}
-  .where a{color:var(--ink)}
-  .card{background:var(--card);border-radius:22px;padding:4px 16px}
-  .rc{display:grid;grid-template-columns:52px 1fr;gap:12px;align-items:start;padding:16px 0;border-bottom:1px solid var(--soft);font-size:16px;line-height:1.5}
+  html,body{margin:0;background:var(--sky);color:var(--ink);font-family:var(--font)}
+  .wrap{max-width:620px;margin:auto;padding:16px 14px 30px}
+  .sign{--s:var(--green);background:var(--s);color:#fff;border-radius:20px;box-shadow:inset 0 0 0 3px var(--s),inset 0 0 0 6px #fff}
+  .brand{--s:var(--brown);display:inline-flex;align-items:center;gap:8px;border-radius:11px;padding:7px 11px 7px 14px;box-shadow:inset 0 0 0 2px var(--s),inset 0 0 0 3.5px #fff;font-size:18px;font-weight:800;font-stretch:85%;text-decoration:none}
+  .brand svg{width:26px;height:18px;flex:none}
+  .head{margin:10px 0 16px;padding:20px 20px 18px}
+  h1{margin:0;font-weight:800;font-stretch:75%;font-size:clamp(40px,12.6vw,54px);line-height:1}
+  .where{font-size:16px;margin:8px 0 0;line-height:1.5}
+  .where a{color:#fff}
+  .card{background:var(--card);border-radius:20px;padding:4px 16px}
+  .rc{display:grid;grid-template-columns:52px 1fr;gap:12px;align-items:start;padding:16px 0;border-bottom:1.5px solid var(--soft);font-size:16px;line-height:1.5}
   .rc:last-child{border-bottom:none}
   .pair{display:flex;padding-top:2px}
   .pm{width:32px;height:32px;border-radius:50%;color:#fff;font-weight:700;display:grid;place-items:center;font-size:14px;border:2px solid #fff;box-shadow:0 2px 6px #0003}
   .pm+.pm{margin-right:-10px}
   .rc small{display:block;color:var(--muted);font-size:14px;margin-top:3px}
   .rc a{display:inline-block;margin-top:8px;font-size:14px;color:var(--ink);background:var(--soft);padding:7px 12px;border-radius:999px;text-decoration:none}
-  .btn{display:block;text-align:center;font-weight:700;border-radius:14px;padding:14px 16px;margin-top:12px;text-decoration:none;font-size:17px;background:var(--sun);color:var(--ink)}
-  .btn.ghost{background:transparent;font-size:16px;box-shadow:inset 0 0 0 1.5px var(--line)}
+  .btn{display:block;text-align:center;font-weight:800;border-radius:13px;padding:14px 16px;margin-top:12px;text-decoration:none;font-size:18px;background:var(--yellow);color:var(--ink);box-shadow:inset 0 0 0 2.5px var(--ink)}
+  .btn.ghost{background:transparent;font-size:16px;font-weight:700;box-shadow:inset 0 0 0 1.5px var(--ink)}
   .empty{padding:18px 0;color:var(--muted)}
-  a:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  a:focus-visible{outline:2.5px solid var(--ink);outline-offset:2px}
+  .sign a:focus-visible{outline-color:#fff}
   footer{text-align:center;color:var(--muted);font-size:12px;padding:18px}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <a class="brand" href="./"><svg class="logo" viewBox="0 0 56 44" aria-hidden="true"><path d="M4 40C15 38 21 24 28 10" stroke="#F0602A"/><path d="M28 41c-4-9 3-19 0-31" stroke="#5B4BE8"/><path d="M52 40C41 38 35 24 28 10" stroke="#17936B"/><circle cx="28" cy="9" r="6" fill="#FFD43B" stroke="#111A36" stroke-width="2.5"/></svg>מפגש פסגה</a>
-  <h1>מי נוסע עם מי</h1>
-  <p class="where" id="where"></p>
+  <a class="brand sign" href="./"><svg viewBox="0 0 26 18" aria-hidden="true"><path d="M1 17 9.5 4l4 6 2.5-3.5L25 17z" fill="#fff"/></svg>מפגש פסגה</a>
+  <div class="head sign">
+    <h1>מי נוסע עם מי</h1>
+    <p class="where" id="where"></p>
+  </div>
   <div class="card" id="list"></div>
   <a class="btn" id="full" href="./">לכל המפה והמסלולים</a>
   <a class="btn ghost" href="./">רוצים לבדוק בעצמכם? למפגש פסגה</a>
