@@ -20,7 +20,7 @@
   header{padding:22px 18px 8px;max-width:1100px;margin:auto}
   h1{margin:0;font-size:30px;font-weight:800;letter-spacing:-.5px}
   h1 span{color:var(--hi);transition:color .3s}
-  body.mine{--hi:var(--c)}
+  body.mine,body.checking{--hi:var(--c)}
   .slogan{margin:2px 0 0;font-size:19px;font-weight:700}
   .sub{color:var(--muted);margin:6px 0 0;font-size:15px;line-height:1.5;max-width:560px}
   .steps{list-style:none;padding:0;margin:12px 0 0;display:flex;gap:6px;flex-wrap:wrap;counter-reset:s}
@@ -134,7 +134,16 @@
   .pop a{display:inline-block;margin-top:4px}
   .pk{width:24px;height:24px;border-radius:50%;background:#fff;border:3px solid;display:grid;place-items:center;font-size:12px;box-shadow:0 2px 6px #0003}
   .newrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-  .flagrow{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}
+  .modes{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:#efe9dc;border-radius:14px;padding:4px;margin-bottom:14px}
+  .mode{font:inherit;color:var(--ink);background:none;border:none;border-radius:11px;padding:9px 10px;cursor:pointer;text-align:right;line-height:1.35;transition:background .15s}
+  .mode b{display:block;font-size:15px}
+  .mode small{display:block;color:var(--muted);font-size:12px}
+  .mode.on{background:#fff;box-shadow:0 1px 4px #0002}
+  .mode.on b{color:var(--hi)}
+  .mode:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .only-check{display:none} body.checking .only-check{display:block}
+  #flagBox{margin-bottom:12px;padding-bottom:12px;border-bottom:1px dashed var(--line)}
+  .flabel{font-size:13px;font-weight:500;color:var(--muted);margin:0 0 6px}
   .dot.flag{background:var(--c);font-size:14px}
   .fm{width:30px;height:30px;border-radius:50%;background:var(--c);border:2px solid #fff;box-shadow:0 2px 6px #0004;display:grid;place-items:center;font-size:15px;cursor:pointer}
   #mineStats{display:none;margin-top:12px}
@@ -164,13 +173,21 @@
 <main>
   <section id="formSec">
     <div class="card">
-      <div class="people" id="people"></div>
-      <div class="row flagrow" id="flagRow">
-        <div class="dot flag">🚩</div>
-        <div class="fields"><input class="addr" id="flagAddr" data-f="addr" placeholder="יש לכם כבר מקום? (לא חובה)" autocomplete="off"></div>
-        <button class="iconbtn" title="בחירה במפה" id="flagPick">📍</button>
-        <button class="del" title="הסרה" id="flagDel">×</button>
+      <div class="modes" id="modes">
+        <button class="mode on" data-m="find" aria-pressed="true"><b>🔍 מצאו לנו נקודה</b><small>אנחנו נמצא איפה הכי שווה</small></button>
+        <button class="mode" data-m="check" aria-pressed="false"><b>🚩 כבר יש לנו נקודה</b><small>בואו נבדוק כמה היא טובה</small></button>
       </div>
+      <div class="only-check" id="flagBox">
+        <div class="flabel">איפה נפגשים?</div>
+        <div class="row" id="flagRow">
+          <div class="dot flag">🚩</div>
+          <div class="fields"><input class="addr" id="flagAddr" data-f="addr" placeholder="כתובת, מקום או עיר" autocomplete="off"></div>
+          <button class="iconbtn" title="בחירה במפה" id="flagPick">📍</button>
+          <button class="del" title="הסרה" id="flagDel">×</button>
+        </div>
+      </div>
+      <div class="flabel only-check">ומי מגיע?</div>
+      <div class="people" id="people"></div>
       <div class="actions">
         <button class="btn ghost" id="add">+ עוד מישהו</button>
         <button class="btn go" id="calc" disabled>מצאו לנו נקודה</button>
@@ -178,7 +195,7 @@
       <div class="progress" id="progress"><i></i></div>
       <div class="status" id="status"></div>
       <div class="newrow"><button class="chip" id="newMeet">✨ מפגש חדש</button><button class="chip" id="dupList">📋 אותם אנשים, מפגש חדש</button></div>
-      <div class="hint">מקלידים ובוחרים מהרשימה. מעדיפים לסמן? לוחצים על 📍 ואז על המפה. עד 25 אנשים. מישהו בלי רכב? מעבירים לו את המתג ל"צריך טרמפ" ונמצא מי יאסוף. כבר יש לכם מקום בראש? שמים אותו ב-🚩 ונגיד לכם כמה הוא הוגן.</div>
+      <div class="hint">מקלידים ובוחרים מהרשימה. מעדיפים לסמן? לוחצים על 📍 ואז על המפה. עד 25 אנשים. מישהו בלי רכב? מעבירים לו את המתג ל"צריך טרמפ" ונמצא מי יאסוף.<span style="display:none" id="checkHint"> נגיד לכם כמה הנקודה הוגנת, כמה כל אחד נוסע, ואיך היא מול מה שאנחנו היינו מוצאים.</span></div>
     </div>
   </section>
 
@@ -254,6 +271,8 @@ let picking = null;
 let results = null; // {sum:{lat,lon,d:[],t?:[]}, fair:{...}, mine?:{...}}
 const flag = { id: "flag", addr: "", lat: null, lon: null };   // the point the group picked themselves (optional)
 let flagMarker = null;
+let formMode = "find";   // "find" = we find the point, "check" = they already have one (🚩) and we rate it
+let flagStash = null;    // flag kept aside while in "find", restored when switching back
 let mode = "sum";
 const placeNames = {};
 
@@ -349,7 +368,7 @@ function renderPeople() {
 }
 function updateCalc() {
   const ready = people.filter(p => p.lat != null).length;
-  $("#calc").disabled = ready < 2;
+  $("#calc").disabled = ready < 2 || (formMode === "check" && flag.lat == null);
 }
 $("#add").onclick = () => addPerson();
 $("#people").addEventListener("click", e => {
@@ -390,6 +409,29 @@ function clearFlag() {
   if (results?.mine) { delete results.mine; pool.mine = null; if (mode === "mine") mode = "fair"; sharePromise = null; writeHash(); showResults(); }
   renderFlag(); syncFlagMarker(); updateCalc();
 }
+// ---------- find / check switch ----------
+function setFormMode(m) {
+  if (m === formMode) return;
+  formMode = m;
+  if (m === "find") {
+    if (picking === "flag") setPicking(null);
+    flagStash = flag.addr || flag.lat != null ? { ...flag } : null;
+    clearFlag();
+  } else if (flagStash) {
+    Object.assign(flag, flagStash); flagStash = null;
+    if (flag.lat != null) onFlagSet(); else renderFlag();
+  }
+  renderMode();
+}
+function renderMode() {
+  const check = formMode === "check";
+  document.body.classList.toggle("checking", check);
+  document.querySelectorAll(".mode").forEach(b => { const on = b.dataset.m === formMode; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
+  $("#checkHint").style.display = check ? "inline" : "none";
+  $("#calc").textContent = check ? "כמה היא טובה?" : "מצאו לנו נקודה";
+  updateCalc();
+}
+$("#modes").addEventListener("click", e => { const b = e.target.closest(".mode"); if (b) setFormMode(b.dataset.m); });
 $("#flagPick").onclick = () => setPicking(picking === "flag" ? null : "flag");
 $("#flagDel").onclick = clearFlag;
 $("#flagAddr").addEventListener("input", e => {
@@ -1182,7 +1224,7 @@ function readHash() {
     data.p.slice(0, MAX_PEOPLE).forEach(([name, lat, lon, addr], i) => addPerson({ name, lat, lon, addr: addr || "נקודה במפה", ride: rides.has(i) }));
     if (data.m === "fair" || data.m === "mine") mode = data.m;
     else if (data.f) mode = "mine";   // a link with our point opens on it
-    if (Array.isArray(data.f)) { flag.lat = data.f[0]; flag.lon = data.f[1]; flag.addr = data.f[2] || "נקודה במפה"; renderFlag(); syncFlagMarker(); }
+    if (Array.isArray(data.f)) { formMode = "check"; flag.lat = data.f[0]; flag.lon = data.f[1]; flag.addr = data.f[2] || "נקודה במפה"; renderFlag(); syncFlagMarker(); }
     openRides = data.v === "rides";
     editOnly = !!data.e;
     return true;
@@ -1211,7 +1253,7 @@ if (readHash() && editOnly) {   // copied list: people only, no auto calculation
 } else {
   addPerson(); addPerson(); addPerson();
 }
-renderFlag();
+renderFlag(); renderMode();
 </script>
 </body>
 </html>
